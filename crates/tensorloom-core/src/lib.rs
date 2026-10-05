@@ -4,6 +4,7 @@ pub mod config;
 pub mod model;
 pub mod events;
 pub mod train;
+pub mod hardware;
 
 #[derive(Serialize)]
 pub struct SystemInfo {

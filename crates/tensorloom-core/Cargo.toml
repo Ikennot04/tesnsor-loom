@@ -9,3 +9,5 @@ serde = { version = "1", features = ["derive"] }
 burn = { version = "0.21.0", features = ["wgpu", "ndarray", "autodiff", "train"] }
 burn-wgpu = "0.21.0"
 thiserror = "2.0.21"
+wgpu = "30.0.1"
+pollster = "1.0.1"
