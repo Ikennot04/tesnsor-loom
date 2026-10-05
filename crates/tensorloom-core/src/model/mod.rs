@@ -1,4 +1,5 @@
 pub mod model;
+pub mod inference;
 
-pub use model::PortableModel;
-pub use model::PrimitiveLayer;
+pub use model::*;
+pub use inference::*;
