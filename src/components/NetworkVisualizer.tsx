@@ -4,16 +4,22 @@ interface Props {
   snapshot: NetworkSnapshot | null;
 }
 
-const WIDTH = 640;
+const MIN_WIDTH = 640;
+const LAYER_GAP = 140; // minimum horizontal space per layer, so deep networks don't get cramped
 const PAD_X = 70;
 const PAD_Y = 40;
 const MIN_HEIGHT = 360;
 const NODE_SLOT = 20; // vertical space reserved per node in the biggest layer
-const LAYER_NAMES = ["Input", "Hidden", "Output"];
 
-function layerX(layer: number, layerCount: number): number {
-  if (layerCount <= 1) return WIDTH / 2;
-  return PAD_X + (layer * (WIDTH - 2 * PAD_X)) / (layerCount - 1);
+function layerName(layer: number, layerCount: number): string {
+  if (layer === 0) return "Input";
+  if (layer === layerCount - 1) return "Output";
+  return `Hidden ${layer}`;
+}
+
+function layerX(layer: number, layerCount: number, width: number): number {
+  if (layerCount <= 1) return width / 2;
+  return PAD_X + (layer * (width - 2 * PAD_X)) / (layerCount - 1);
 }
 
 function nodeY(index: number, count: number, height: number): number {
@@ -27,7 +33,7 @@ function maxAbs(values: number[]): number {
 }
 
 /** Live network drawing: edge width/opacity = |weight|, blue = positive, red = negative,
- *  node opacity = mean activation. Draws every node in every layer. */
+ *  node opacity = mean activation. Draws every node in every layer, for any number of layers. */
 export function NetworkVisualizer({ snapshot }: Props) {
   if (!snapshot) {
     return <p>The network appears here once training starts.</p>;
@@ -36,21 +42,25 @@ export function NetworkVisualizer({ snapshot }: Props) {
   const sizes = snapshot.layer_sizes;
   const layerCount = sizes.length;
   const biggest = Math.max(...sizes, 1);
+
+  // The canvas grows with the network instead of squeezing everything in.
+  const width = Math.max(MIN_WIDTH, 2 * PAD_X + (layerCount - 1) * LAYER_GAP);
   const height = Math.max(MIN_HEIGHT, biggest * NODE_SLOT + 2 * PAD_Y);
   const slot = (height - 2 * PAD_Y) / biggest;
   const radius = Math.max(1.5, Math.min(9, slot / 2 - 0.5));
+
   const edgeMax = maxAbs(snapshot.edges.flatMap((block) => block.weights));
 
   return (
-    <figure>
+    <figure style={{ overflowX: "auto", margin: 0 }}>
       <svg
-        width={WIDTH}
+        width={width}
         height={height}
-        viewBox={`0 0 ${WIDTH} ${height}`}
+        viewBox={`0 0 ${width} ${height}`}
         role="img"
         aria-label={`Neural network at epoch ${snapshot.epoch}`}
       >
-        <rect x={0} y={0} width={WIDTH} height={height} fill="white" stroke="gray" />
+        <rect x={0} y={0} width={width} height={height} fill="white" stroke="gray" />
 
         {/* edges first so nodes draw on top */}
         {snapshot.edges.map((block, k) => {
@@ -64,9 +74,9 @@ export function NetworkVisualizer({ snapshot }: Props) {
               lines.push(
                 <line
                   key={`${k}-${r}-${c}`}
-                  x1={layerX(k, layerCount)}
+                  x1={layerX(k, layerCount, width)}
                   y1={nodeY(r, fromCount, height)}
-                  x2={layerX(k + 1, layerCount)}
+                  x2={layerX(k + 1, layerCount, width)}
                   y2={nodeY(c, toCount, height)}
                   stroke={w >= 0 ? "steelblue" : "tomato"}
                   strokeWidth={0.3 + 2.2 * strength}
@@ -89,7 +99,7 @@ export function NetworkVisualizer({ snapshot }: Props) {
                 return (
                   <circle
                     key={i}
-                    cx={layerX(l, layerCount)}
+                    cx={layerX(l, layerCount, width)}
                     cy={nodeY(i, count, height)}
                     r={radius}
                     fill="goldenrod"
@@ -99,8 +109,13 @@ export function NetworkVisualizer({ snapshot }: Props) {
                   />
                 );
               })}
-              <text x={layerX(l, layerCount)} y={height - 12} textAnchor="middle" fontSize={12}>
-                {(LAYER_NAMES[l] ?? `Layer ${l}`) + " (" + count + ")"}
+              <text
+                x={layerX(l, layerCount, width)}
+                y={height - 12}
+                textAnchor="middle"
+                fontSize={12}
+              >
+                {layerName(l, layerCount) + " (" + count + ")"}
               </text>
             </g>
           );
