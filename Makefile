@@ -23,4 +23,12 @@ run: build
 	./target/release/server --open
 
 dev:
-	cargo run -p server & npm run dev
+	npm i
+	npm run tauri dev
+
+clean:
+	rm -rf node_modules
+	rm -rf ui/node_modules
+	rm -rf ui/dist
+	cd src-tauri && cargo clean
+	cd ..

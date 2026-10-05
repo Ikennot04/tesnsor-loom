@@ -6,6 +6,7 @@ import { TrainingSection, type TrainingParams } from "./components/TrainingSecti
 import { HardwareSection } from "./components/HardwareSection";
 import { ExportSection } from "./components/ExportSection";
 import { ProgressPanel } from "./components/ProgressPanel";
+import { ModelTester } from "./components/ModelTester";
 import { useTrainingSession } from "./hooks/useTrainingSession";
 import { summarizeCsv } from "./utils/csv";
 
@@ -65,7 +66,7 @@ export default function App() {
         <DataSection
           csv={csv}
           onChange={setCsv}
-          onFeatureCountSuggested={(n) => setLayers((prev: any) => ({ ...prev, in_features: n }))}
+          onFeatureCountSuggested={(n) => setLayers((prev) => ({ ...prev, in_features: n }))}
         />
         <NetworkSection value={layers} onChange={setLayers} />
         <TrainingSection value={params} onChange={setParams} />
@@ -93,6 +94,8 @@ export default function App() {
         log={session.log}
         snapshot={session.snapshot}
       />
+
+      <ModelTester suggestedPath={outputPath} />
     </main>
   );
 }
