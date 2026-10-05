@@ -1,56 +1,98 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import "./App.css";
+import { useState, type FormEvent } from "react";
+import type { ExportFormat, HardwareTarget, LayerConfig } from "./types/type";
+import { DataSection } from "./components/DataSection";
+import { NetworkSection } from "./components/NetworkSection";
+import { TrainingSection, type TrainingParams } from "./components/TrainingSection";
+import { HardwareSection } from "./components/HardwareSection";
+import { ExportSection } from "./components/ExportSection";
+import { ProgressPanel } from "./components/ProgressPanel";
+import { useTrainingSession } from "./hooks/useTrainingSession";
+import { summarizeCsv } from "./utils/csv";
 
-import { call } from "./api";
+export default function App() {
+  const [csv, setCsv] = useState("");
+  const [layers, setLayers] = useState<LayerConfig>({
+    in_features: 3,
+    out_features: 16,
+    activation: "relu",
+  });
+  const [params, setParams] = useState<TrainingParams>({
+    epochs: 100,
+    batch_size: 32,
+    lr: 0.001,
+  });
+  const [hardware, setHardware] = useState<HardwareTarget>({
+    target_mode: "CPU",
+    device_index: 0,
+  });
+  const [exportFormat, setExportFormat] = useState<ExportFormat>("json");
+  const [outputPath, setOutputPath] = useState("");
+  const [formError, setFormError] = useState("");
 
-function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+  const session = useTrainingSession();
 
-  async function greet() {
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    if (session.running) return;
 
-    try {
-      setGreetMsg(await call<string>("greet", { name }))
-    } catch (e) {
-      setGreetMsg(`Error: ${e}`);
+    const summary = summarizeCsv(csv);
+    if (summary.rows === 0) {
+      setFormError("Please load or paste CSV data first.");
+      return;
     }
-  }
+    if (summary.columns !== layers.in_features + 1) {
+      setFormError(
+        `CSV has ${summary.columns} columns but the network expects ` +
+          `${layers.in_features} features + 1 target (${layers.in_features + 1}).`,
+      );
+      return;
+    }
+
+    setFormError("");
+    void session.start({
+      config: { ...params, layers, hardware },
+      data: csv.trim(),
+      exportFormat,
+      outputPath: outputPath.trim(),
+    });
+  };
 
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
+    <main>
+      <h1>TensorLoom</h1>
 
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
+      <form onSubmit={handleSubmit}>
+        <DataSection
+          csv={csv}
+          onChange={setCsv}
+          onFeatureCountSuggested={(n) => setLayers((prev: any) => ({ ...prev, in_features: n }))}
         />
-        <button type="submit">Greet</button>
+        <NetworkSection value={layers} onChange={setLayers} />
+        <TrainingSection value={params} onChange={setParams} />
+        <HardwareSection value={hardware} onChange={setHardware} />
+        <ExportSection
+          format={exportFormat}
+          outputPath={outputPath}
+          onFormatChange={setExportFormat}
+          onOutputPathChange={setOutputPath}
+        />
+
+        {formError && <p role="alert">{formError}</p>}
+
+        <p>
+          <button type="submit" disabled={session.running}>
+            {session.running ? "Training..." : "Start training"}
+          </button>
+        </p>
       </form>
-      <p>{greetMsg}</p>
+
+      <ProgressPanel
+        progress={session.progress}
+        status={session.status}
+        epochs={session.epochs}
+        log={session.log}
+        snapshot={session.snapshot}
+      />
     </main>
   );
 }
-
-export default App;
