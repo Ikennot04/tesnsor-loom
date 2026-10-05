@@ -1,0 +1,21 @@
+# Rust
+target/
+
+# Node
+node_modules/
+dist/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# Logs
+*.log
