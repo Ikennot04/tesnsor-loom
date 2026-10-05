@@ -2,7 +2,10 @@ import { useState, type FormEvent } from "react";
 import type { ExportFormat, HardwareTarget, LayerConfig } from "./types/type";
 import { DataSection } from "./components/DataSection";
 import { NetworkSection } from "./components/NetworkSection";
-import { TrainingSection, type TrainingParams } from "./components/TrainingSection";
+import {
+  TrainingSection,
+  type TrainingParams,
+} from "./components/TrainingSection";
 import { HardwareSection } from "./components/HardwareSection";
 import { ExportSection } from "./components/ExportSection";
 import { ProgressPanel } from "./components/ProgressPanel";
@@ -14,8 +17,9 @@ export default function App() {
   const [csv, setCsv] = useState("");
   const [layers, setLayers] = useState<LayerConfig>({
     in_features: 3,
-    out_features: 16,
-    activation: "relu",
+    hidden_layers: [{ units: 16, activation: "relu" }],
+    out_features: 1,
+    output_activation: "none",
   });
   const [params, setParams] = useState<TrainingParams>({
     epochs: 100,
@@ -41,10 +45,11 @@ export default function App() {
       setFormError("Please load or paste CSV data first.");
       return;
     }
-    if (summary.columns !== layers.in_features + 1) {
+    const expectedColumns = layers.in_features + layers.out_features;
+    if (summary.columns !== expectedColumns) {
       setFormError(
         `CSV has ${summary.columns} columns but the network expects ` +
-          `${layers.in_features} features + 1 target (${layers.in_features + 1}).`,
+          `${layers.in_features} features + ${layers.out_features} target(s) (${expectedColumns}).`,
       );
       return;
     }
@@ -66,7 +71,9 @@ export default function App() {
         <DataSection
           csv={csv}
           onChange={setCsv}
-          onFeatureCountSuggested={(n) => setLayers((prev) => ({ ...prev, in_features: n }))}
+          onFeatureCountSuggested={(n) =>
+            setLayers((prev) => ({ ...prev, in_features: n }))
+          }
         />
         <NetworkSection value={layers} onChange={setLayers} />
         <TrainingSection value={params} onChange={setParams} />
