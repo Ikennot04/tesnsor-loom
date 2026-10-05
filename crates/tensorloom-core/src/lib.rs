@@ -1,5 +1,10 @@
 use serde::{Deserialize, Serialize};
 
+pub mod config;
+pub mod model;
+pub mod events;
+pub mod train;
+
 #[derive(Serialize)]
 pub struct SystemInfo {
     pub cpu_count: usize,
