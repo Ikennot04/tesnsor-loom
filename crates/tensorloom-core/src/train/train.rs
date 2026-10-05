@@ -13,9 +13,6 @@ use burn::optim::{AdamConfig, GradientsParams, Optimizer};
 use burn::tensor::backend::{AutodiffBackend, Backend};
 use burn::tensor::{Tensor, TensorData};
 
-/// Max nodes drawn per layer in the UI. Keeps each emitted event small.
-const MAX_SHOWN_NODES: usize = 12;
-
 /// Core neural network topology.
 #[derive(Module, Debug)]
 pub struct TensorLoomNetwork<B: Backend> {
@@ -115,31 +112,8 @@ fn tensor_to_vec<B: Backend, const D: usize>(t: Tensor<B, D>) -> Result<Vec<f32>
 }
 
 // ---------------------------------------------------------------------------
-// Snapshot helpers (what the UI draws)
+// Snapshot (what the UI draws): every node and every weight, no sampling
 // ---------------------------------------------------------------------------
-
-/// Evenly spaced indices, always including the first and last node.
-fn pick_indices(total: usize, max: usize) -> Vec<usize> {
-    if total <= max {
-        return (0..total).collect();
-    }
-    (0..max).map(|i| i * (total - 1) / (max - 1)).collect()
-}
-
-fn sample(values: &[f32], idx: &[usize]) -> Vec<f32> {
-    idx.iter().map(|&i| values[i]).collect()
-}
-
-/// `w` is a Burn Linear weight: row-major [d_input, d_output].
-fn edge_block(w: &[f32], out_dim: usize, from: &[usize], to: &[usize]) -> EdgeBlock {
-    let mut weights = Vec::with_capacity(from.len() * to.len());
-    for &r in from {
-        for &c in to {
-            weights.push(w[r * out_dim + c]);
-        }
-    }
-    EdgeBlock { rows: from.len(), cols: to.len(), weights }
-}
 
 fn build_snapshot<B: AutodiffBackend>(
     epoch: usize,
@@ -152,25 +126,23 @@ fn build_snapshot<B: AutodiffBackend>(
 
     // Detach from autodiff so we can read the raw weights.
     let inner = model.valid();
+    // Burn Linear weights are row-major [d_input, d_output], which matches
+    // the frontend's `weights[r * cols + c]` indexing.
     let w1 = tensor_to_vec(inner.input_layer.weight.val())?;
     let w2 = tensor_to_vec(inner.output_layer.weight.val())?;
-
-    let in_idx = pick_indices(n_in, MAX_SHOWN_NODES);
-    let hid_idx = pick_indices(n_hid, MAX_SHOWN_NODES);
-    let out_idx = pick_indices(n_out, MAX_SHOWN_NODES);
 
     Ok(NetworkSnapshot {
         epoch,
         layer_sizes: vec![n_in, n_hid, n_out],
-        shown_sizes: vec![in_idx.len(), hid_idx.len(), out_idx.len()],
+        shown_sizes: vec![n_in, n_hid, n_out], // everything is shown now
         node_activity: vec![
-            sample(input_mean, &in_idx),
-            sample(hidden_mean, &hid_idx),
-            sample(output_mean, &out_idx),
+            input_mean.to_vec(),
+            hidden_mean.to_vec(),
+            output_mean.to_vec(),
         ],
         edges: vec![
-            edge_block(&w1, n_hid, &in_idx, &hid_idx),
-            edge_block(&w2, n_out, &hid_idx, &out_idx),
+            EdgeBlock { rows: n_in, cols: n_hid, weights: w1 },
+            EdgeBlock { rows: n_hid, cols: n_out, weights: w2 },
         ],
     })
 }
@@ -221,8 +193,9 @@ where
 
     let lr = config.lr as f64;
 
-    // Throttle: at most ~100 snapshots per run, plus first and last epoch.
-    let snapshot_every = (config.epochs / 100).max(1);
+    // Throttle: at most ~20 snapshots per run, plus first and last epoch.
+    // Snapshots now carry every weight, so they are much larger than before.
+    let snapshot_every = (config.epochs / 20).max(1);
 
     for epoch in 1..=config.epochs {
         let _ = tx.send(TrainEvent::EpochStarted { epoch });
