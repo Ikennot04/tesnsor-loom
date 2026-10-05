@@ -1,10 +1,17 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct HiddenLayerConfig {
+    pub units: usize,
+    pub activation: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LayerConfig {
     pub in_features: usize,
+    pub hidden_layers: Vec<HiddenLayerConfig>,
     pub out_features: usize,
-    pub activation: String, // "relu", "sigmoid", etc.
+    pub output_activation: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
