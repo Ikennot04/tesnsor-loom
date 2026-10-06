@@ -28,14 +28,23 @@ pub fn export_model<T: Serialize>(
                 .map_err(|e| format!("Failed to serialize model (mpk): {e}"))?,
             "mpk",
         ),
+        "bin" => (
+            bincode::serialize(model)
+                .map_err(|e| format!("Failed to serialize model (bin): {e}"))?,
+            "bin",
+        ),
+        "onnx" => {
+            return Err("ONNX export requires a PortableModel instance. Use a specialized export function for ONNX.".to_string());
+        }
         other => {
             return Err(format!(
-                "Unsupported export format '{other}'. Use one of: json, mpk."
+                "Unsupported export format '{other}'. Use one of: json, mpk, bin, onnx."
             ));
         }
     };
 
     let target = Path::new(output_path).with_extension(ext);
+
 
     if let Some(parent) = target.parent() {
         if !parent.as_os_str().is_empty() {
