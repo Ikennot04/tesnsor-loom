@@ -5,12 +5,26 @@ use super::PortableModel;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Evaluation {
-    pub rows: usize,
+pub struct OutputEvaluation {
+    pub index: usize,
     pub mse: f32,
     /// 1.0 = perfect, 0.0 = no better than predicting the average, < 0 = worse than that.
     pub r2: f32,
     pub mean_target: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Evaluation {
+    pub rows: usize,
+    /// Average of the per-output MSE values.
+    pub mse: f32,
+    /// Average of the per-output R² values (1.0 = perfect, 0.0 = no better than the mean, < 0 = worse).
+    pub r2: f32,
+    /// Average of the per-output target means.
+    pub mean_target: f32,
+    /// One entry per model output, in output order.
+    #[serde(default)]
+    pub per_output: Vec<OutputEvaluation>,
 }
 
 fn activate(name: &str, v: f32) -> Result<f32, String> {
@@ -104,8 +118,13 @@ impl PortableModel {
     }
 }
 
-/// Parse `feature_1,...,feature_n,target` rows. A non-numeric first row is a header.
-fn parse_rows(raw: &str, in_features: usize) -> Result<(Vec<Vec<f32>>, Vec<f32>), String> {
+/// Parse `feature_1,...,feature_n,target_1,...,target_m` rows. A non-numeric first row is a header.
+fn parse_rows(
+    raw: &str,
+    in_features: usize,
+    out_features: usize,
+) -> Result<(Vec<Vec<f32>>, Vec<Vec<f32>>), String> {
+    let expected_cols = in_features + out_features;
     let mut rows = Vec::new();
     let mut targets = Vec::new();
 
@@ -120,17 +139,18 @@ fn parse_rows(raw: &str, in_features: usize) -> Result<(Vec<Vec<f32>>, Vec<f32>)
             Err(_) if rows.is_empty() => continue, // header
             Err(e) => return Err(format!("CSV line {}: {}", line_no + 1, e)),
         };
-        if values.len() != in_features + 1 {
+        if values.len() != expected_cols {
             return Err(format!(
-                "CSV line {}: expected {} columns ({} features + 1 target), found {}",
+                "CSV line {}: expected {} columns ({} features + {} targets), found {}",
                 line_no + 1,
-                in_features + 1,
+                expected_cols,
                 in_features,
+                out_features,
                 values.len()
             ));
         }
         rows.push(values[..in_features].to_vec());
-        targets.push(values[in_features]);
+        targets.push(values[in_features..].to_vec());
     }
 
     if rows.is_empty() {
@@ -139,29 +159,53 @@ fn parse_rows(raw: &str, in_features: usize) -> Result<(Vec<Vec<f32>>, Vec<f32>)
     Ok((rows, targets))
 }
 
-/// Score a model on a CSV that includes the target column (single-output models only).
+/// Score a model on a CSV that includes the target column(s), one per model output.
 pub fn evaluate(model: &PortableModel, raw_csv: &str) -> Result<Evaluation, String> {
     model.validate()?;
     let n_in = model.input_size().ok_or("model has no layers")?;
-    if model.output_size() != Some(1) {
-        return Err("evaluate currently supports models with exactly one output".to_string());
-    }
+    let n_out = model.output_size().ok_or("model has no layers")?;
 
-    let (rows, targets) = parse_rows(raw_csv, n_in)?;
+    let (rows, targets) = parse_rows(raw_csv, n_in, n_out)?;
     let n = rows.len() as f32;
 
-    let mean_target = targets.iter().sum::<f32>() / n;
-    let mut sq_err = 0.0f32;
-    let mut sq_var = 0.0f32;
-    for (row, &t) in rows.iter().zip(&targets) {
-        let p = model.predict_unchecked(row)?[0];
-        sq_err += (p - t) * (p - t);
-        sq_var += (t - mean_target) * (t - mean_target);
+    // Per-output target means.
+    let mut means = vec![0.0f32; n_out];
+    for t in &targets {
+        for (m, v) in means.iter_mut().zip(t) {
+            *m += v;
+        }
+    }
+    for m in &mut means {
+        *m /= n;
     }
 
-    let mse = sq_err / n;
-    let var = sq_var / n;
-    let r2 = if var > f32::EPSILON { 1.0 - mse / var } else { 0.0 };
+    let mut sq_err = vec![0.0f32; n_out];
+    let mut sq_var = vec![0.0f32; n_out];
+    for (row, t) in rows.iter().zip(&targets) {
+        let pred = model.predict_unchecked(row)?;
+        for j in 0..n_out {
+            let e = pred[j] - t[j];
+            let d = t[j] - means[j];
+            sq_err[j] += e * e;
+            sq_var[j] += d * d;
+        }
+    }
 
-    Ok(Evaluation { rows: rows.len(), mse, r2, mean_target })
+    let per_output: Vec<OutputEvaluation> = (0..n_out)
+        .map(|j| {
+            let mse = sq_err[j] / n;
+            let var = sq_var[j] / n;
+            let r2 = if var > f32::EPSILON { 1.0 - mse / var } else { 0.0 };
+            OutputEvaluation { index: j, mse, r2, mean_target: means[j] }
+        })
+        .collect();
+
+    let k = n_out as f32;
+    Ok(Evaluation {
+        rows: rows.len(),
+        mse: per_output.iter().map(|o| o.mse).sum::<f32>() / k,
+        r2: per_output.iter().map(|o| o.r2).sum::<f32>() / k,
+        mean_target: per_output.iter().map(|o| o.mean_target).sum::<f32>() / k,
+        per_output,
+    })
 }
