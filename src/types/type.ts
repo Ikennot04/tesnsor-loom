@@ -1,9 +1,15 @@
 // Mirrors the Rust structs in tensorloom-core (serde field names are snake_case).
 
+export interface HiddenLayerConfig {
+  units: number;
+  activation: string; // "relu" | "tanh" | "sigmoid"
+}
+
 export interface LayerConfig {
   in_features: number;
-  out_features: number;
-  activation: string;
+  hidden_layers: HiddenLayerConfig[];
+  out_features: number;       // output units (= number of target columns in the CSV)
+  output_activation: string;  // "none" | "relu" | "tanh" | "sigmoid"
 }
 
 export type TargetMode = "CPU" | "GPU_DISCRETE" | "GPU_INTEGRATED";
@@ -24,7 +30,8 @@ export interface TrainConfig {
 export interface DetectedGpu {
   id: number;
   name: string;
-  device_type: "Discrete" | "Integrated" | "CPU";
+  device_type: "Discrete" | "Integrated" | "Virtual";
+  backend: string;
 }
 
 export interface HardwareInventory {

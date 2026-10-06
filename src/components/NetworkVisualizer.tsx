@@ -4,16 +4,31 @@ interface Props {
   snapshot: NetworkSnapshot | null;
 }
 
-const WIDTH = 640;
+const MIN_WIDTH = 640;
+const LAYER_GAP = 140;
 const PAD_X = 70;
 const PAD_Y = 40;
 const MIN_HEIGHT = 360;
-const NODE_SLOT = 20; // vertical space reserved per node in the biggest layer
-const LAYER_NAMES = ["Input", "Hidden", "Output"];
+const NODE_SLOT = 20;
 
-function layerX(layer: number, layerCount: number): number {
-  if (layerCount <= 1) return WIDTH / 2;
-  return PAD_X + (layer * (WIDTH - 2 * PAD_X)) / (layerCount - 1);
+const COLOR = {
+  surface: "#F8FAFC",
+  secondary: "#4A5568",
+  primary: "#6984A9",
+  accent: "#A0D585",
+  negative: "#EF4444",
+  node: "#6984A9",
+};
+
+function layerName(layer: number, layerCount: number): string {
+  if (layer === 0) return "Input";
+  if (layer === layerCount - 1) return "Output";
+  return `Hidden ${layer}`;
+}
+
+function layerX(layer: number, layerCount: number, width: number): number {
+  if (layerCount <= 1) return width / 2;
+  return PAD_X + (layer * (width - 2 * PAD_X)) / (layerCount - 1);
 }
 
 function nodeY(index: number, count: number, height: number): number {
@@ -26,33 +41,48 @@ function maxAbs(values: number[]): number {
   return m > 0 ? m : 1;
 }
 
-/** Live network drawing: edge width/opacity = |weight|, blue = positive, red = negative,
- *  node opacity = mean activation. Draws every node in every layer. */
+/** Live network drawing: edge width/opacity = |weight|, green = positive, red = negative,
+ *  node opacity = mean activation. Draws every node in every layer, for any number of layers. */
 export function NetworkVisualizer({ snapshot }: Props) {
   if (!snapshot) {
-    return <p>The network appears here once training starts.</p>;
+    return (
+      <p className="text-sm text-secondary">
+        The network appears here once training starts.
+      </p>
+    );
   }
 
   const sizes = snapshot.layer_sizes;
   const layerCount = sizes.length;
   const biggest = Math.max(...sizes, 1);
+
+  const width = Math.max(MIN_WIDTH, 2 * PAD_X + (layerCount - 1) * LAYER_GAP);
   const height = Math.max(MIN_HEIGHT, biggest * NODE_SLOT + 2 * PAD_Y);
   const slot = (height - 2 * PAD_Y) / biggest;
   const radius = Math.max(1.5, Math.min(9, slot / 2 - 0.5));
+
   const edgeMax = maxAbs(snapshot.edges.flatMap((block) => block.weights));
 
   return (
-    <figure>
+    <figure className="m-0 overflow-x-auto">
       <svg
-        width={WIDTH}
+        className="block max-w-none"
+        width={width}
         height={height}
-        viewBox={`0 0 ${WIDTH} ${height}`}
+        viewBox={`0 0 ${width} ${height}`}
         role="img"
         aria-label={`Neural network at epoch ${snapshot.epoch}`}
       >
-        <rect x={0} y={0} width={WIDTH} height={height} fill="white" stroke="gray" />
+        <rect
+          x={0}
+          y={0}
+          width={width}
+          height={height}
+          fill={COLOR.surface}
+          stroke={COLOR.secondary}
+          strokeOpacity={0.35}
+        />
 
-        {/* edges first so nodes draw on top */}
         {snapshot.edges.map((block, k) => {
           const fromCount = sizes[k];
           const toCount = sizes[k + 1];
@@ -64,11 +94,11 @@ export function NetworkVisualizer({ snapshot }: Props) {
               lines.push(
                 <line
                   key={`${k}-${r}-${c}`}
-                  x1={layerX(k, layerCount)}
+                  x1={layerX(k, layerCount, width)}
                   y1={nodeY(r, fromCount, height)}
-                  x2={layerX(k + 1, layerCount)}
+                  x2={layerX(k + 1, layerCount, width)}
                   y2={nodeY(c, toCount, height)}
-                  stroke={w >= 0 ? "steelblue" : "tomato"}
+                  stroke={w >= 0 ? COLOR.accent : COLOR.negative}
                   strokeWidth={0.3 + 2.2 * strength}
                   strokeOpacity={0.12 + 0.8 * strength}
                 />,
@@ -78,7 +108,6 @@ export function NetworkVisualizer({ snapshot }: Props) {
           return <g key={`edges-${k}`}>{lines}</g>;
         })}
 
-        {/* nodes */}
         {sizes.map((count, l) => {
           const activity = snapshot.node_activity[l] ?? [];
           const layerMax = maxAbs(activity);
@@ -89,26 +118,34 @@ export function NetworkVisualizer({ snapshot }: Props) {
                 return (
                   <circle
                     key={i}
-                    cx={layerX(l, layerCount)}
+                    cx={layerX(l, layerCount, width)}
                     cy={nodeY(i, count, height)}
                     r={radius}
-                    fill="goldenrod"
-                    fillOpacity={0.15 + 0.85 * level}
-                    stroke="black"
-                    strokeWidth={radius > 4 ? 1 : 0.5}
+                    fill={COLOR.node}
+                    fillOpacity={0.2 + 0.8 * level}
+                    stroke={COLOR.accent}
+                    strokeWidth={radius > 4 ? 1.25 : 0.75}
                   />
                 );
               })}
-              <text x={layerX(l, layerCount)} y={height - 12} textAnchor="middle" fontSize={12}>
-                {(LAYER_NAMES[l] ?? `Layer ${l}`) + " (" + count + ")"}
+              <text
+                x={layerX(l, layerCount, width)}
+                y={height - 12}
+                textAnchor="middle"
+                fontSize={12}
+                fill={COLOR.secondary}
+                fontFamily="Plus Jakarta Sans, sans-serif"
+                fontWeight={600}
+              >
+                {layerName(l, layerCount) + " (" + count + ")"}
               </text>
             </g>
           );
         })}
       </svg>
-      <figcaption>
-        Epoch {snapshot.epoch}. Blue = positive weight, red = negative, thicker = larger. Node
-        brightness = mean activation.
+      <figcaption className="mt-2 text-xs text-secondary">
+        Epoch {snapshot.epoch}. Green = positive weight, red = negative, thicker = larger.
+        Node brightness = mean activation.
       </figcaption>
     </figure>
   );

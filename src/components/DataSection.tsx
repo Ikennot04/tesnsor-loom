@@ -1,4 +1,4 @@
-import type { ChangeEvent } from "react";
+import { useRef, type ChangeEvent } from "react";
 import { summarizeCsv } from "../utils/csv";
 
 interface Props {
@@ -9,6 +9,7 @@ interface Props {
 
 export function DataSection({ csv, onChange, onFeatureCountSuggested }: Props) {
   const summary = summarizeCsv(csv);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -19,34 +20,60 @@ export function DataSection({ csv, onChange, onFeatureCountSuggested }: Props) {
     if (s.columns > 1) onFeatureCountSuggested(s.columns - 1);
   };
 
+  const summaryText =
+    summary.rows === 0
+      ? "No data loaded."
+      : `${summary.rows} rows, ${summary.columns} columns${
+          summary.hasHeader ? " (header detected)" : ""
+        }.`;
+
   return (
-    <fieldset>
-      <legend>1. Data</legend>
-      <p>
-        <label>
-          CSV file: <input type="file" accept=".csv,text/csv,text/plain" onChange={handleFile} />
+    <section className="neo-raised h-full w-full p-6 sm:p-8">
+      <header className="mb-6">
+        <h2 className="text-xl font-bold tracking-tight text-primary">1. Data</h2>
+        <p className="mt-1 text-sm text-secondary">
+          Load or paste CSV data. The last column is the target.
+        </p>
+      </header>
+
+      <div className="neo-inset flex flex-wrap items-center justify-between gap-3 px-4 py-4">
+        <span className="text-sm font-medium text-secondary">CSV file</span>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".csv,text/csv,text/plain"
+          className="sr-only"
+          onChange={handleFile}
+        />
+        <button
+          type="button"
+          className="neo-btn"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          Choose CSV
+        </button>
+      </div>
+
+      <div className="mt-6">
+        <label
+          htmlFor="csv-paste"
+          className="mb-2 block text-sm font-medium text-secondary"
+        >
+          Or paste CSV
         </label>
-      </p>
-      <p>
-        <label>
-          Or paste CSV (last column is the target):
-          <br />
-          <textarea
-            rows={8}
-            cols={70}
-            value={csv}
-            placeholder={"f1,f2,f3,target\n0.1,0.2,0.3,1.0"}
-            onChange={(e) => onChange(e.target.value)}
-          />
-        </label>
-      </p>
-      <p>
-        {summary.rows === 0
-          ? "No data loaded."
-          : `${summary.rows} rows, ${summary.columns} columns${
-              summary.hasHeader ? " (header detected)" : ""
-            }.`}
-      </p>
-    </fieldset>
+        <textarea
+          id="csv-paste"
+          rows={8}
+          value={csv}
+          placeholder={"f1,f2,f3,target\n0.1,0.2,0.3,1.0"}
+          onChange={(e) => onChange(e.target.value)}
+          className="neo-inset box-border w-full resize-y bg-transparent px-4 py-3 font-mono text-sm text-primary placeholder:text-secondary/50"
+        />
+      </div>
+
+      <div className="mt-5">
+        <span className="neo-chip">{summaryText}</span>
+      </div>
+    </section>
   );
 }
