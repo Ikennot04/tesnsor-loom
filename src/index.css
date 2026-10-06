@@ -1,0 +1,352 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #2C2891;
+  --color-secondary: #4a5568;
+  --color-accent: #39A388;
+  --color-surface: #f8fafc;
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  --neo-light: #ffffff;
+  --neo-dark: #d1d9e6;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-sans);
+  color: var(--color-primary);
+  background-color: color-mix(in srgb, var(--color-primary) 4%, var(--color-surface));
+}
+
+@keyframes bento-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.bento-tile {
+  animation: bento-in 0.45s ease both;
+}
+
+.bento-d1 {
+  animation-delay: 0.02s;
+}
+.bento-d2 {
+  animation-delay: 0.06s;
+}
+.bento-d3 {
+  animation-delay: 0.1s;
+}
+.bento-d4 {
+  animation-delay: 0.14s;
+}
+.bento-d5 {
+  animation-delay: 0.18s;
+}
+.bento-d6 {
+  animation-delay: 0.22s;
+}
+.bento-d7 {
+  animation-delay: 0.26s;
+}
+.bento-d8 {
+  animation-delay: 0.3s;
+}
+.bento-d9 {
+  animation-delay: 0.34s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bento-tile {
+    animation: none;
+  }
+}
+
+.neo-raised {
+  background: var(--color-surface);
+  border-radius: 1.25rem;
+  box-shadow:
+    8px 8px 16px var(--neo-dark),
+    -8px -8px 16px var(--neo-light);
+}
+
+.neo-inset {
+  background: var(--color-surface);
+  border: 1.5px solid color-mix(in srgb, var(--color-secondary) 45%, transparent);
+  border-radius: 1rem;
+  box-shadow:
+    inset 4px 4px 8px var(--neo-dark),
+    inset -4px -4px 8px var(--neo-light);
+}
+
+.neo-inset:focus {
+  border-color: var(--color-accent);
+  outline: none;
+}
+
+.neo-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.25rem;
+  border: none;
+  border-radius: 0.875rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #ffffff;
+  background: var(--color-accent);
+  cursor: pointer;
+  box-shadow:
+    5px 5px 10px var(--neo-dark),
+    -5px -5px 10px var(--neo-light);
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.15s ease,
+    filter 0.15s ease;
+}
+
+.neo-btn:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.neo-btn:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow:
+    inset 3px 3px 6px rgba(0, 0, 0, 0.2),
+    inset -2px -2px 4px rgba(255, 255, 255, 0.15);
+}
+
+.neo-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.neo-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: none;
+}
+
+.neo-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.9rem;
+  border: none;
+  border-radius: 0.75rem;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-secondary);
+  background: var(--color-surface);
+  cursor: pointer;
+  box-shadow:
+    4px 4px 8px var(--neo-dark),
+    -4px -4px 8px var(--neo-light);
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.neo-btn-ghost:hover {
+  color: var(--color-primary);
+}
+
+.neo-btn-ghost:active {
+  transform: translateY(1px);
+  box-shadow:
+    inset 3px 3px 6px var(--neo-dark),
+    inset -2px -2px 4px var(--neo-light);
+}
+
+.neo-btn-ghost:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.neo-field {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.65rem 0.9rem;
+  border: 1.5px solid color-mix(in srgb, var(--color-secondary) 45%, transparent);
+  border-radius: 0.75rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-primary);
+  background: var(--color-surface);
+  box-shadow:
+    inset 3px 3px 6px var(--neo-dark),
+    inset -3px -3px 6px var(--neo-light);
+  appearance: none;
+}
+
+.neo-field:focus {
+  border-color: var(--color-accent);
+  outline: none;
+}
+
+select.neo-field {
+  cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--color-secondary) 50%),
+    linear-gradient(135deg, var(--color-secondary) 50%, transparent 50%);
+  background-position:
+    calc(100% - 16px) calc(50% - 3px),
+    calc(100% - 11px) calc(50% - 3px);
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 2rem;
+}
+
+.neo-segment {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding: 0.4rem;
+  border: 1.5px solid color-mix(in srgb, var(--color-secondary) 45%, transparent);
+  border-radius: 0.875rem;
+  background: var(--color-surface);
+  box-shadow:
+    inset 3px 3px 6px var(--neo-dark),
+    inset -3px -3px 6px var(--neo-light);
+}
+
+.neo-segment-option {
+  flex: 1 1 auto;
+  min-width: 4.5rem;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  border-radius: 0.65rem;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  color: var(--color-secondary);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    box-shadow 0.15s ease,
+    color 0.15s ease,
+    background 0.15s ease,
+    transform 0.15s ease;
+}
+
+.neo-segment-option:hover:not([aria-pressed="true"]) {
+  color: var(--color-primary);
+}
+
+.neo-segment-option[aria-pressed="true"] {
+  color: #ffffff;
+  background: var(--color-accent);
+  box-shadow:
+    3px 3px 6px var(--neo-dark),
+    -2px -2px 5px var(--neo-light);
+}
+
+.neo-segment-option:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.neo-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-secondary);
+  background: var(--color-surface);
+  box-shadow:
+    4px 4px 8px var(--neo-dark),
+    -4px -4px 8px var(--neo-light);
+}
+
+.neo-progress {
+  width: 100%;
+  height: 0.75rem;
+  border: 1.5px solid color-mix(in srgb, var(--color-secondary) 45%, transparent);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--color-surface);
+  box-shadow:
+    inset 3px 3px 6px var(--neo-dark),
+    inset -3px -3px 6px var(--neo-light);
+  appearance: none;
+}
+
+.neo-progress::-webkit-progress-bar {
+  background: transparent;
+  border-radius: 999px;
+}
+
+.neo-progress::-webkit-progress-value {
+  background: var(--color-accent);
+  border-radius: 999px;
+}
+
+.neo-progress::-moz-progress-bar {
+  background: var(--color-accent);
+  border-radius: 999px;
+}
+
+.neo-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.neo-table th,
+.neo-table td {
+  padding: 0.55rem 0.75rem;
+  text-align: left;
+}
+
+.neo-table thead th {
+  font-weight: 600;
+  color: var(--color-primary);
+  border-bottom: 1.5px solid color-mix(in srgb, var(--color-secondary) 35%, transparent);
+}
+
+.neo-table tbody tr:not(:last-child) td {
+  border-bottom: 1px solid color-mix(in srgb, var(--color-secondary) 20%, transparent);
+}
+
+.neo-table tbody td {
+  color: var(--color-secondary);
+}
+
+.neo-log {
+  margin: 0;
+  max-height: 12rem;
+  overflow: auto;
+  padding: 0.85rem 1rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--color-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.neo-alert {
+  padding: 0.65rem 0.9rem;
+  border: 1.5px solid color-mix(in srgb, #ef4444 40%, transparent);
+  border-radius: 0.75rem;
+  font-size: 0.85rem;
+  color: #b91c1c;
+  background: color-mix(in srgb, #fef2f2 80%, var(--color-surface));
+}
