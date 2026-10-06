@@ -6,8 +6,50 @@ interface Props {
 }
 
 const MAX_HIDDEN_LAYERS = 8;
-const HIDDEN_ACTIVATIONS = ["relu", "tanh", "sigmoid"];
-const OUTPUT_ACTIVATIONS = ["none", "relu", "tanh", "sigmoid"];
+const HIDDEN_ACTIVATIONS = ["relu", "tanh", "sigmoid"] as const;
+const OUTPUT_ACTIVATIONS = ["none", "relu", "tanh", "sigmoid"] as const;
+
+function ActivationPicker({
+  id,
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  options: readonly string[];
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <span id={id} className="block text-xs font-medium text-secondary">
+        {label}
+      </span>
+      <div
+        role="group"
+        aria-labelledby={id}
+        className="neo-segment"
+      >
+        {options.map((option) => {
+          const selected = value === option;
+          return (
+            <button
+              key={option}
+              type="button"
+              aria-pressed={selected}
+              className="neo-segment-option"
+              onClick={() => onChange(option)}
+            >
+              {option}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export function NetworkSection({ value, onChange }: Props) {
   const setHidden = (index: number, patch: Partial<HiddenLayerConfig>) => {
@@ -37,7 +79,7 @@ export function NetworkSection({ value, onChange }: Props) {
   };
 
   return (
-    <section className="neo-raised mx-auto mt-6 w-1/3 min-w-[280px] max-w-full p-6 sm:p-8">
+    <section className="neo-raised h-full w-full p-6 sm:p-8">
       <header className="mb-6">
         <h2 className="text-xl font-bold tracking-tight text-primary">2. Network</h2>
         <p className="mt-1 text-sm text-secondary">
@@ -112,28 +154,13 @@ export function NetworkSection({ value, onChange }: Props) {
                     className="neo-field"
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor={`hidden-act-${i}`}
-                    className="block text-xs font-medium text-secondary"
-                  >
-                    Activation
-                  </label>
-                  <select
-                    id={`hidden-act-${i}`}
-                    value={layer.activation}
-                    onChange={(e) =>
-                      setHidden(i, { activation: e.target.value })
-                    }
-                    className="neo-field"
-                  >
-                    {HIDDEN_ACTIVATIONS.map((a) => (
-                      <option key={a} value={a}>
-                        {a}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <ActivationPicker
+                  id={`hidden-act-${i}`}
+                  label="Activation"
+                  options={HIDDEN_ACTIVATIONS}
+                  value={layer.activation}
+                  onChange={(activation) => setHidden(i, { activation })}
+                />
               </div>
               <button
                 type="button"
@@ -186,26 +213,15 @@ export function NetworkSection({ value, onChange }: Props) {
         </div>
 
         <div className="space-y-2">
-          <label
-            htmlFor="out-activation"
-            className="block text-sm font-medium text-secondary"
-          >
-            Output activation
-          </label>
-          <select
+          <ActivationPicker
             id="out-activation"
+            label="Output activation"
+            options={OUTPUT_ACTIVATIONS}
             value={value.output_activation}
-            onChange={(e) =>
-              onChange({ ...value, output_activation: e.target.value })
+            onChange={(output_activation) =>
+              onChange({ ...value, output_activation })
             }
-            className="neo-field"
-          >
-            {OUTPUT_ACTIVATIONS.map((a) => (
-              <option key={a} value={a}>
-                {a}
-              </option>
-            ))}
-          </select>
+          />
           <p className="text-xs text-secondary">Use none for regression.</p>
         </div>
       </div>

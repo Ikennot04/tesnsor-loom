@@ -2,9 +2,9 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #0a192f;
+  --color-primary: #6984a9;
   --color-secondary: #4a5568;
-  --color-accent: #10b981;
+  --color-accent: #a0d585;
   --color-surface: #f8fafc;
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
 }
@@ -19,7 +19,56 @@ body {
   min-height: 100vh;
   font-family: var(--font-sans);
   color: var(--color-primary);
-  background-color: var(--color-surface);
+  background-color: color-mix(in srgb, var(--color-primary) 4%, var(--color-surface));
+}
+
+@keyframes bento-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.bento-tile {
+  animation: bento-in 0.45s ease both;
+}
+
+.bento-d1 {
+  animation-delay: 0.02s;
+}
+.bento-d2 {
+  animation-delay: 0.06s;
+}
+.bento-d3 {
+  animation-delay: 0.1s;
+}
+.bento-d4 {
+  animation-delay: 0.14s;
+}
+.bento-d5 {
+  animation-delay: 0.18s;
+}
+.bento-d6 {
+  animation-delay: 0.22s;
+}
+.bento-d7 {
+  animation-delay: 0.26s;
+}
+.bento-d8 {
+  animation-delay: 0.3s;
+}
+.bento-d9 {
+  animation-delay: 0.34s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bento-tile {
+    animation: none;
+  }
 }
 
 .neo-raised {
@@ -159,6 +208,57 @@ select.neo-field {
   background-size: 5px 5px;
   background-repeat: no-repeat;
   padding-right: 2rem;
+}
+
+.neo-segment {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding: 0.4rem;
+  border: 1.5px solid color-mix(in srgb, var(--color-secondary) 45%, transparent);
+  border-radius: 0.875rem;
+  background: var(--color-surface);
+  box-shadow:
+    inset 3px 3px 6px var(--neo-dark),
+    inset -3px -3px 6px var(--neo-light);
+}
+
+.neo-segment-option {
+  flex: 1 1 auto;
+  min-width: 4.5rem;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  border-radius: 0.65rem;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  color: var(--color-secondary);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    box-shadow 0.15s ease,
+    color 0.15s ease,
+    background 0.15s ease,
+    transform 0.15s ease;
+}
+
+.neo-segment-option:hover:not([aria-pressed="true"]) {
+  color: var(--color-primary);
+}
+
+.neo-segment-option[aria-pressed="true"] {
+  color: #ffffff;
+  background: var(--color-accent);
+  box-shadow:
+    3px 3px 6px var(--neo-dark),
+    -2px -2px 5px var(--neo-light);
+}
+
+.neo-segment-option:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .neo-chip {

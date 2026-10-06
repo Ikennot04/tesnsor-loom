@@ -14,10 +14,10 @@ const NODE_SLOT = 20;
 const COLOR = {
   surface: "#F8FAFC",
   secondary: "#4A5568",
-  primary: "#0A192F",
-  accent: "#10B981",
+  primary: "#6984A9",
+  accent: "#A0D585",
   negative: "#EF4444",
-  node: "#0A192F",
+  node: "#6984A9",
 };
 
 function layerName(layer: number, layerCount: number): string {

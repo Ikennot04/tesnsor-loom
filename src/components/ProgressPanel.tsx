@@ -18,7 +18,7 @@ export function ProgressPanel({ progress, status, epochs, log, snapshot }: Props
   const recent = epochs.slice(-VISIBLE_ROWS);
 
   return (
-    <section className="neo-raised mx-auto mt-6 w-1/3 min-w-[280px] max-w-full p-6 sm:p-8">
+    <section className="neo-raised h-full w-full p-6 sm:p-8">
       <header className="mb-6">
         <h2 className="text-xl font-bold tracking-tight text-primary">Progress</h2>
         <p className="mt-1 text-sm text-secondary">
@@ -37,17 +37,18 @@ export function ProgressPanel({ progress, status, epochs, log, snapshot }: Props
         )}
       </div>
 
-      <div className="mt-8 space-y-3">
-        <h3 className="text-sm font-semibold text-primary">Network (live)</h3>
-        <div className="neo-inset overflow-x-auto p-4">
-          <NetworkVisualizer snapshot={snapshot} />
+      <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-4">
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-primary">Network (live)</h3>
+          <div className="neo-inset overflow-x-auto p-4">
+            <NetworkVisualizer snapshot={snapshot} />
+          </div>
         </div>
-      </div>
-
-      <div className="mt-8 space-y-3">
-        <h3 className="text-sm font-semibold text-primary">Loss</h3>
-        <div className="neo-inset overflow-x-auto p-4">
-          <LossChart values={epochs.map((row) => row.avgLoss)} />
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-primary">Loss</h3>
+          <div className="neo-inset overflow-x-auto p-4">
+            <LossChart values={epochs.map((row) => row.avgLoss)} />
+          </div>
         </div>
       </div>
 

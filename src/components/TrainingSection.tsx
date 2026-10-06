@@ -9,7 +9,7 @@ interface Props {
 
 export function TrainingSection({ value, onChange }: Props) {
   return (
-    <section className="neo-raised mx-auto mt-6 w-1/3 min-w-[280px] max-w-full p-6 sm:p-8">
+    <section className="neo-raised h-full w-full p-6 sm:p-8">
       <header className="mb-6">
         <h2 className="text-xl font-bold tracking-tight text-primary">
           3. Training

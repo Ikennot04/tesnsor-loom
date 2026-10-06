@@ -64,59 +64,113 @@ export default function App() {
   };
 
   return (
-    <main className="px-4 py-8 sm:py-12">
-      <header className="mx-auto mb-8 w-1/3 min-w-[280px] max-w-full text-center">
-        <h1 className="text-3xl font-bold tracking-tight text-primary sm:text-4xl">
-          TensorLoom
-        </h1>
-        <p className="mt-2 text-sm text-secondary">
-          Train and export neural networks locally.
-        </p>
-      </header>
-
-      <form onSubmit={handleSubmit}>
-        <DataSection
-          csv={csv}
-          onChange={setCsv}
-          onFeatureCountSuggested={(n) =>
-            setLayers((prev) => ({ ...prev, in_features: n }))
-          }
-        />
-        <NetworkSection value={layers} onChange={setLayers} />
-        <TrainingSection value={params} onChange={setParams} />
-        <HardwareSection value={hardware} onChange={setHardware} />
-        <ExportSection
-          format={exportFormat}
-          outputPath={outputPath}
-          onFormatChange={setExportFormat}
-          onOutputPathChange={setOutputPath}
-        />
-
-        {formError && (
-          <p
-            role="alert"
-            className="neo-alert mx-auto mt-6 w-1/3 min-w-[280px] max-w-full"
-          >
-            {formError}
+    <main className="w-full px-[clamp(1.25rem,6vw,15rem)] py-[clamp(1.5rem,3.5vw,4rem)]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-5">
+        <header className="bento-tile bento-d1 overflow-hidden rounded-[1.25rem] bg-primary px-6 py-8 text-white sm:px-10 sm:py-10 lg:col-span-12">
+          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
+            TensorLoom
+          </h1>
+          <p className="mt-3 max-w-xl text-sm text-white/70 sm:text-base">
+            Train and export neural networks locally.
           </p>
-        )}
+        </header>
 
-        <p className="mx-auto mt-6 w-1/3 min-w-[280px] max-w-full">
-          <button type="submit" className="neo-btn w-full" disabled={session.running}>
-            {session.running ? "Training..." : "Start training"}
-          </button>
-        </p>
-      </form>
+        <form onSubmit={handleSubmit} className="contents">
+          <div className="bento-tile bento-d2 lg:col-span-5">
+            <DataSection
+              csv={csv}
+              onChange={setCsv}
+              onFeatureCountSuggested={(n) =>
+                setLayers((prev) => ({ ...prev, in_features: n }))
+              }
+            />
+          </div>
 
-      <ProgressPanel
-        progress={session.progress}
-        status={session.status}
-        epochs={session.epochs}
-        log={session.log}
-        snapshot={session.snapshot}
-      />
+          <div className="bento-tile bento-d3 lg:col-span-7">
+            <NetworkSection value={layers} onChange={setLayers} />
+          </div>
 
-      <ModelTester suggestedPath={outputPath} />
+          <div className="bento-tile bento-d4 lg:col-span-6">
+            <TrainingSection value={params} onChange={setParams} />
+          </div>
+
+          <div className="bento-tile bento-d5 lg:col-span-6">
+            <HardwareSection value={hardware} onChange={setHardware} />
+          </div>
+
+          <div className="bento-tile bento-d6 lg:col-span-9">
+            <ExportSection
+              format={exportFormat}
+              outputPath={outputPath}
+              onFormatChange={setExportFormat}
+              onOutputPathChange={setOutputPath}
+            />
+          </div>
+
+          <div className="bento-tile bento-d7 neo-raised flex h-full flex-col justify-between gap-6 p-6 sm:p-8 lg:col-span-3">
+            <header>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">
+                Step 6
+              </p>
+              <h2 className="mt-2 text-xl font-bold tracking-tight text-primary">
+                {session.running ? "Training in progress" : "Ready to train"}
+              </h2>
+              <p className="mt-2 text-sm leading-relaxed text-secondary">
+                {session.running
+                  ? "Watch the Progress panel for live loss, network weights, and logs."
+                  : "Confirm data, network, and export path, then run a local training session."}
+              </p>
+            </header>
+
+            <div className="space-y-3">
+              <div className="neo-inset flex flex-col gap-2 px-4 py-3 text-sm text-secondary">
+                <span className="flex items-center justify-between gap-2">
+                  <span>Epochs</span>
+                  <span className="font-semibold text-primary">{params.epochs}</span>
+                </span>
+                <span className="flex items-center justify-between gap-2">
+                  <span>Batch</span>
+                  <span className="font-semibold text-primary">{params.batch_size}</span>
+                </span>
+                <span className="flex items-center justify-between gap-2">
+                  <span>Device</span>
+                  <span className="font-semibold text-primary">
+                    {hardware.target_mode}
+                  </span>
+                </span>
+              </div>
+
+              {formError && (
+                <p role="alert" className="neo-alert">
+                  {formError}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                className="neo-btn min-h-14 w-full px-6 py-4 text-base sm:min-h-16 sm:text-lg"
+                disabled={session.running}
+              >
+                {session.running ? "Training..." : "Start training"}
+              </button>
+            </div>
+          </div>
+        </form>
+
+        <div className="bento-tile bento-d8 lg:col-span-8">
+          <ProgressPanel
+            progress={session.progress}
+            status={session.status}
+            epochs={session.epochs}
+            log={session.log}
+            snapshot={session.snapshot}
+          />
+        </div>
+
+        <div className="bento-tile bento-d9 lg:col-span-4">
+          <ModelTester suggestedPath={outputPath} />
+        </div>
+      </div>
     </main>
   );
 }

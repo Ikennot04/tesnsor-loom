@@ -42,7 +42,7 @@ export function LossChart({ values }: Props) {
         <polyline
           points={points}
           fill="none"
-          stroke="#10B981"
+          stroke="#A0D585"
           strokeWidth={2.5}
           strokeLinecap="round"
           strokeLinejoin="round"

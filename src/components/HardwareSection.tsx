@@ -30,7 +30,7 @@ export function HardwareSection({ value, onChange }: Props) {
     });
 
   return (
-    <section className="neo-raised mx-auto mt-6 w-1/3 min-w-[280px] max-w-full p-6 sm:p-8">
+    <section className="neo-raised h-full w-full p-6 sm:p-8">
       <header className="mb-6">
         <h2 className="text-xl font-bold tracking-tight text-primary">4. Hardware</h2>
         <p className="mt-1 text-sm text-secondary">
