@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import {
   evaluateModel,
   loadModel,
@@ -14,8 +14,10 @@ interface Props {
 }
 
 function describeScore(r2: number): string {
-  if (r2 < 0) return "Worse than always guessing the average. The model needs more training (try a higher learning rate or more epochs).";
-  if (r2 < 0.5) return "Weak. It has learned a little, but a lot of the pattern is missing.";
+  if (r2 < 0)
+    return "Worse than always guessing the average. The model needs more training (try a higher learning rate or more epochs).";
+  if (r2 < 0.5)
+    return "Weak. It has learned a little, but a lot of the pattern is missing.";
   if (r2 < 0.9) return "Decent. It captures most of the pattern.";
   return "Strong. Predictions track the targets closely.";
 }
@@ -31,9 +33,11 @@ export function ModelTester({ suggestedPath }: Props) {
   const [evalFileName, setEvalFileName] = useState("");
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
   const [busy, setBusy] = useState(false);
+  const evalFileRef = useRef<HTMLInputElement>(null);
 
   const canUseSuggested =
-    !!suggestedPath && (suggestedPath.endsWith(".json") || suggestedPath.endsWith(".bin"));
+    !!suggestedPath &&
+    (suggestedPath.endsWith(".json") || suggestedPath.endsWith(".bin"));
 
   const openModel = async (path: string) => {
     setError("");
@@ -105,97 +109,161 @@ export function ModelTester({ suggestedPath }: Props) {
   };
 
   const placeholder = summary
-    ? Array.from({ length: summary.input_size }, (_, i) => (0.1 * (i + 1)).toFixed(1)).join(", ")
+    ? Array.from({ length: summary.input_size }, (_, i) =>
+        (0.1 * (i + 1)).toFixed(1),
+      ).join(", ")
     : "";
 
   return (
-    <section>
-      <h2>Test a trained model</h2>
+    <section className="neo-raised mx-auto mt-6 w-1/3 min-w-[280px] max-w-full p-6 sm:p-8">
+      <header className="mb-6">
+        <h2 className="text-xl font-bold tracking-tight text-primary">
+          Test a trained model
+        </h2>
+        <p className="mt-1 text-sm text-secondary">
+          Load a model to predict a row or score a CSV.
+        </p>
+      </header>
 
-      <p>
-        <button type="button" onClick={handleBrowse}>
-          Open model...
-        </button>{" "}
-        {canUseSuggested && (
-          <button type="button" onClick={() => openModel(suggestedPath!)}>
-            Use export path
+      <div className="neo-inset flex flex-wrap items-center justify-between gap-3 px-4 py-4">
+        <span className="text-sm font-medium text-secondary">Model file</span>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className="neo-btn" onClick={handleBrowse}>
+            Open model...
           </button>
-        )}
-      </p>
+          {canUseSuggested && (
+            <button
+              type="button"
+              className="neo-btn-ghost"
+              onClick={() => openModel(suggestedPath!)}
+            >
+              Use export path
+            </button>
+          )}
+        </div>
+      </div>
 
-      {error && <p role="alert">{error}</p>}
+      {error && (
+        <p role="alert" className="neo-alert mt-4">
+          {error}
+        </p>
+      )}
 
       {summary && (
-        <>
-          <h3>Model</h3>
-          <p>{summary.path}</p>
-          <p>
-            {summary.input_size} inputs, {summary.output_size} output(s), {summary.parameters} parameters.
-          </p>
-          <ol>
-            {summary.layers.map((layer, i) => (
-              <li key={i}>
-                {layer.inputs} to {layer.outputs} ({layer.activation})
-              </li>
-            ))}
-          </ol>
+        <div className="mt-6 space-y-8">
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-primary">Model</h3>
+            <p className="break-all text-xs text-secondary">{summary.path}</p>
+            <div className="flex flex-wrap gap-2">
+              <span className="neo-chip">{summary.input_size} inputs</span>
+              <span className="neo-chip">{summary.output_size} output(s)</span>
+              <span className="neo-chip">{summary.parameters} parameters</span>
+            </div>
+            <ol className="neo-inset space-y-2 px-4 py-3 text-sm text-secondary">
+              {summary.layers.map((layer, i) => (
+                <li key={i}>
+                  {layer.inputs} to {layer.outputs} ({layer.activation})
+                </li>
+              ))}
+            </ol>
+          </div>
 
-          <h3>Predict one row</h3>
-          <p>
-            <label>
-              Features ({summary.input_size} values, comma separated):
-              <br />
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-primary">Predict one row</h3>
+            <label
+              htmlFor="predict-features"
+              className="block text-sm font-medium text-secondary"
+            >
+              Features ({summary.input_size} values, comma separated)
+            </label>
+            <div className="neo-inset flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center">
               <input
+                id="predict-features"
                 type="text"
-                size={60}
                 value={inputText}
                 placeholder={placeholder}
                 onChange={(e) => setInputText(e.target.value)}
+                className="neo-field min-w-0 flex-1 border-0 shadow-none"
               />
-            </label>{" "}
-            <button type="button" onClick={handlePredict} disabled={busy}>
-              Predict
-            </button>
-          </p>
-          {prediction && <p>Prediction: {prediction.map((v) => v.toFixed(4)).join(", ")}</p>}
+              <button
+                type="button"
+                className="neo-btn shrink-0"
+                onClick={handlePredict}
+                disabled={busy}
+              >
+                Predict
+              </button>
+            </div>
+            {prediction && (
+              <p className="neo-chip">
+                Prediction: {prediction.map((v) => v.toFixed(4)).join(", ")}
+              </p>
+            )}
+          </div>
 
-          <h3>Score on a CSV</h3>
-          <p>
-            <label>
-              CSV with a target column (last column):{" "}
-              <input type="file" accept=".csv,text/csv,text/plain" onChange={handleEvalFile} />
-            </label>{" "}
-            <button type="button" onClick={handleEvaluate} disabled={busy || !evalCsv}>
-              Evaluate
-            </button>
-          </p>
-          {evalFileName && <p>Loaded {evalFileName}.</p>}
-          {evaluation && (
-            <>
-              <table border={1} cellPadding={4}>
-                <tbody>
-                  <tr>
-                    <th>Rows</th>
-                    <td>{evaluation.rows}</td>
-                  </tr>
-                  <tr>
-                    <th>Mean squared error</th>
-                    <td>{evaluation.mse.toFixed(4)}</td>
-                  </tr>
-                  <tr>
-                    <th>R² score</th>
-                    <td>{evaluation.r2.toFixed(3)}</td>
-                  </tr>
-                  <tr>
-                    <th>Mean target</th>
-                    <td>{evaluation.mean_target.toFixed(4)}</td>
-                  </tr>
-                </tbody>
-              </table>
-              <p>{describeScore(evaluation.r2)}</p>
-            </>
-          )}
-        </>
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-primary">Score on a CSV</h3>
+            <div className="neo-inset flex flex-wrap items-center justify-between gap-3 px-4 py-4">
+              <span className="text-sm font-medium text-secondary">
+                CSV with a target column (last column)
+              </span>
+              <input
+                ref={evalFileRef}
+                type="file"
+                accept=".csv,text/csv,text/plain"
+                className="sr-only"
+                onChange={handleEvalFile}
+              />
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="neo-btn-ghost"
+                  onClick={() => evalFileRef.current?.click()}
+                >
+                  Choose CSV
+                </button>
+                <button
+                  type="button"
+                  className="neo-btn"
+                  onClick={handleEvaluate}
+                  disabled={busy || !evalCsv}
+                >
+                  Evaluate
+                </button>
+              </div>
+            </div>
+            {evalFileName && (
+              <span className="neo-chip">Loaded {evalFileName}</span>
+            )}
+            {evaluation && (
+              <div className="space-y-3">
+                <div className="neo-inset overflow-x-auto px-2 py-2">
+                  <table className="neo-table">
+                    <tbody>
+                      <tr>
+                        <th>Rows</th>
+                        <td>{evaluation.rows}</td>
+                      </tr>
+                      <tr>
+                        <th>Mean squared error</th>
+                        <td>{evaluation.mse.toFixed(4)}</td>
+                      </tr>
+                      <tr>
+                        <th>R² score</th>
+                        <td>{evaluation.r2.toFixed(3)}</td>
+                      </tr>
+                      <tr>
+                        <th>Mean target</th>
+                        <td>{evaluation.mean_target.toFixed(4)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-sm text-secondary">{describeScore(evaluation.r2)}</p>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </section>
   );
