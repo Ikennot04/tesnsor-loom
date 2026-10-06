@@ -2,9 +2,9 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #6984a9;
+  --color-primary: #2C2891;
   --color-secondary: #4a5568;
-  --color-accent: #a0d585;
+  --color-accent: #39A388;
   --color-surface: #f8fafc;
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
 }
