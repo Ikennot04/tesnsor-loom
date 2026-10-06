@@ -64,8 +64,15 @@ export default function App() {
   };
 
   return (
-    <main>
-      <h1>TensorLoom</h1>
+    <main className="px-4 py-8 sm:py-12">
+      <header className="mx-auto mb-8 w-1/3 min-w-[280px] max-w-full text-center">
+        <h1 className="text-3xl font-bold tracking-tight text-primary sm:text-4xl">
+          TensorLoom
+        </h1>
+        <p className="mt-2 text-sm text-secondary">
+          Train and export neural networks locally.
+        </p>
+      </header>
 
       <form onSubmit={handleSubmit}>
         <DataSection
@@ -85,10 +92,17 @@ export default function App() {
           onOutputPathChange={setOutputPath}
         />
 
-        {formError && <p role="alert">{formError}</p>}
+        {formError && (
+          <p
+            role="alert"
+            className="neo-alert mx-auto mt-6 w-1/3 min-w-[280px] max-w-full"
+          >
+            {formError}
+          </p>
+        )}
 
-        <p>
-          <button type="submit" disabled={session.running}>
+        <p className="mx-auto mt-6 w-1/3 min-w-[280px] max-w-full">
+          <button type="submit" className="neo-btn w-full" disabled={session.running}>
             {session.running ? "Training..." : "Start training"}
           </button>
         </p>
