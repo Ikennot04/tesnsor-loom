@@ -24,13 +24,17 @@ function withExtension(path: string, ext: string): string {
   return `${base}.${ext}`;
 }
 
-export function ExportSection({ format, outputPath, onFormatChange, onOutputPathChange }: Props) {
+export function ExportSection({
+  format,
+  outputPath,
+  onFormatChange,
+  onOutputPathChange,
+}: Props) {
   const [dialogError, setDialogError] = useState("");
   const { ext, label } = FORMATS[format];
 
   const handleFormatChange = (next: ExportFormat) => {
     onFormatChange(next);
-    // Keep the chosen folder and name, just swap the extension.
     if (outputPath) onOutputPathChange(withExtension(outputPath, FORMATS[next].ext));
   };
 
@@ -42,7 +46,6 @@ export function ExportSection({ format, outputPath, onFormatChange, onOutputPath
         defaultPath: outputPath || `model.${ext}`,
         filters: [{ name: label, extensions: [ext] }],
       });
-      // `null` means the user cancelled.
       if (selected) onOutputPathChange(withExtension(selected, ext));
     } catch (err) {
       setDialogError(`Could not open the save dialog: ${String(err)}`);
@@ -50,37 +53,65 @@ export function ExportSection({ format, outputPath, onFormatChange, onOutputPath
   };
 
   return (
-    <fieldset>
-      <legend>5. Export</legend>
-      <p>
-        <label>
-          Format:{" "}
-          <select value={format} onChange={(e) => handleFormatChange(e.target.value as ExportFormat)}>
+    <section className="neo-raised mx-auto mt-6 w-1/3 min-w-[280px] max-w-full p-6 sm:p-8">
+      <header className="mb-6">
+        <h2 className="text-xl font-bold tracking-tight text-primary">5. Export</h2>
+        <p className="mt-1 text-sm text-secondary">
+          Choose format and destination for the trained model.
+        </p>
+      </header>
+
+      <div className="space-y-5">
+        <div className="space-y-2">
+          <label
+            htmlFor="export-format"
+            className="block text-sm font-medium text-secondary"
+          >
+            Format
+          </label>
+          <select
+            id="export-format"
+            value={format}
+            onChange={(e) => handleFormatChange(e.target.value as ExportFormat)}
+            className="neo-field"
+          >
             {Object.entries(FORMATS).map(([value, f]) => (
               <option key={value} value={value}>
                 {f.label}
               </option>
             ))}
           </select>
-        </label>
-      </p>
-      <p>
-        <label>
-          Save to:{" "}
-          <input
-            type="text"
-            size={60}
-            required
-            value={outputPath}
-            placeholder={`/Users/you/Desktop/model.${ext}`}
-            onChange={(e) => onOutputPathChange(e.target.value)}
-          />
-        </label>{" "}
-        <button type="button" onClick={handleBrowse}>
-          Browse...
-        </button>
-      </p>
-      {dialogError && <p role="alert">{dialogError}</p>}
-    </fieldset>
+        </div>
+
+        <div className="space-y-2">
+          <label
+            htmlFor="output-path"
+            className="block text-sm font-medium text-secondary"
+          >
+            Save to
+          </label>
+          <div className="neo-inset flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center">
+            <input
+              id="output-path"
+              type="text"
+              required
+              value={outputPath}
+              placeholder={`/Users/you/Desktop/model.${ext}`}
+              onChange={(e) => onOutputPathChange(e.target.value)}
+              className="neo-field min-w-0 flex-1 border-0 shadow-none"
+            />
+            <button type="button" className="neo-btn shrink-0" onClick={handleBrowse}>
+              Browse...
+            </button>
+          </div>
+        </div>
+
+        {dialogError && (
+          <p role="alert" className="neo-alert">
+            {dialogError}
+          </p>
+        )}
+      </div>
+    </section>
   );
 }
