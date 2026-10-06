@@ -67,11 +67,11 @@ body {
     filter 0.15s ease;
 }
 
-.neo-btn:hover {
+.neo-btn:hover:not(:disabled) {
   filter: brightness(1.05);
 }
 
-.neo-btn:active {
+.neo-btn:active:not(:disabled) {
   transform: translateY(1px);
   box-shadow:
     inset 3px 3px 6px rgba(0, 0, 0, 0.2),
@@ -81,6 +81,84 @@ body {
 .neo-btn:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
+}
+
+.neo-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: none;
+}
+
+.neo-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.9rem;
+  border: none;
+  border-radius: 0.75rem;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-secondary);
+  background: var(--color-surface);
+  cursor: pointer;
+  box-shadow:
+    4px 4px 8px var(--neo-dark),
+    -4px -4px 8px var(--neo-light);
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.neo-btn-ghost:hover {
+  color: var(--color-primary);
+}
+
+.neo-btn-ghost:active {
+  transform: translateY(1px);
+  box-shadow:
+    inset 3px 3px 6px var(--neo-dark),
+    inset -2px -2px 4px var(--neo-light);
+}
+
+.neo-btn-ghost:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.neo-field {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.65rem 0.9rem;
+  border: 1.5px solid color-mix(in srgb, var(--color-secondary) 45%, transparent);
+  border-radius: 0.75rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-primary);
+  background: var(--color-surface);
+  box-shadow:
+    inset 3px 3px 6px var(--neo-dark),
+    inset -3px -3px 6px var(--neo-light);
+  appearance: none;
+}
+
+.neo-field:focus {
+  border-color: var(--color-accent);
+  outline: none;
+}
+
+select.neo-field {
+  cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--color-secondary) 50%),
+    linear-gradient(135deg, var(--color-secondary) 50%, transparent 50%);
+  background-position:
+    calc(100% - 16px) calc(50% - 3px),
+    calc(100% - 11px) calc(50% - 3px);
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 2rem;
 }
 
 .neo-chip {
