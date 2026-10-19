@@ -7,6 +7,7 @@ import {
   type TaskConfig,
 } from "./types/type";
 import { DataSection } from "./components/DataSection";
+import { EnvironmentSection } from "./components/EnvironmentSection";
 import { NetworkSection } from "./components/NetworkSection";
 import {
   TrainingSection,
@@ -19,8 +20,20 @@ import { ModelTester } from "./components/ModelTester";
 import { useTrainingSession } from "./hooks/useTrainingSession";
 import { summarizeCsv } from "./utils/csv";
 
+/** Parses the environment JSON. Returns null when empty, undefined when invalid. */
+function parseEnvironment(json: string): Record<string, unknown> | null | undefined {
+  if (!json.trim()) return null;
+  try {
+    const parsed = JSON.parse(json);
+    return typeof parsed === "object" && parsed !== null ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export default function App() {
   const [csv, setCsv] = useState("");
+  const [envJson, setEnvJson] = useState("");
   const [layers, setLayers] = useState<LayerConfig>({
     in_features: 3,
     hidden_layers: [{ units: 16, activation: "relu" }],
@@ -43,10 +56,36 @@ export default function App() {
 
   const session = useTrainingSession();
   const isClassification = task.loss === "cross_entropy";
+  const hasEnvironment = envJson.trim().length > 0;
+
+  // Keep the task panel in sync with the rules file (the backend re-applies it anyway).
+  const handleEnvironmentChange = (json: string) => {
+    setEnvJson(json);
+    const env = parseEnvironment(json);
+    const envTask = env && (env.task as Partial<TaskConfig> | undefined);
+    if (envTask && typeof envTask === "object") {
+      setTask((prev) => ({ ...prev, ...envTask }));
+      if (envTask.loss === "cross_entropy") {
+        setLayers((prev) => ({ ...prev, output_activation: "none" }));
+      }
+    }
+  };
+
+  const handleDatasetGenerated = (csvText: string, inF: number, outF: number) => {
+    setCsv(csvText);
+    setLayers((prev) => ({ ...prev, in_features: inF, out_features: outF }));
+    setFormError("");
+  };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (session.running) return;
+
+    const environment = parseEnvironment(envJson);
+    if (environment === undefined) {
+      setFormError("The environment JSON is invalid. Fix it or clear it.");
+      return;
+    }
 
     const summary = summarizeCsv(csv);
     if (summary.rows === 0) {
@@ -79,7 +118,7 @@ export default function App() {
 
     setFormError("");
     void session.start({
-      config: { ...params, layers, hardware, task },
+      config: { ...params, layers, hardware, task, environment },
       data: csv.trim(),
       exportFormat,
       outputPath: outputPath.trim(),
@@ -100,16 +139,27 @@ export default function App() {
 
         <form onSubmit={handleSubmit} className="contents">
           <div className="bento-tile bento-d2 lg:col-span-5">
-            <DataSection
-              csv={csv}
-              onChange={setCsv}
-              onFeatureCountSuggested={(n) =>
-                setLayers((prev) => ({ ...prev, in_features: n }))
-              }
+            <EnvironmentSection
+              json={envJson}
+              onChange={handleEnvironmentChange}
+              onDatasetGenerated={handleDatasetGenerated}
             />
           </div>
 
-          <div className="bento-tile bento-d3 lg:col-span-7">
+          <div className="bento-tile bento-d2 lg:col-span-7">
+            <DataSection
+              csv={csv}
+              onChange={setCsv}
+              onFeatureCountSuggested={(n) => {
+                // With an environment, the rules file decides the layer sizes.
+                if (!hasEnvironment) {
+                  setLayers((prev) => ({ ...prev, in_features: n }));
+                }
+              }}
+            />
+          </div>
+
+          <div className="bento-tile bento-d3 lg:col-span-12">
             <NetworkSection
               value={layers}
               onChange={setLayers}
@@ -170,6 +220,12 @@ export default function App() {
                   <span>Device</span>
                   <span className="font-semibold text-primary">
                     {hardware.target_mode}
+                  </span>
+                </span>
+                <span className="flex items-center justify-between gap-2">
+                  <span>Environment</span>
+                  <span className="font-semibold text-primary">
+                    {hasEnvironment ? "rules.json" : "none"}
                   </span>
                 </span>
               </div>

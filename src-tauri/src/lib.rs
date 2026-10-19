@@ -8,6 +8,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             commands::training::start_training_session,
+            commands::training::validate_environment,
+            commands::training::generate_dataset,
             commands::hardware::detect_hardware,
             commands::model_commands::load_model,
             commands::model_commands::predict_rows,

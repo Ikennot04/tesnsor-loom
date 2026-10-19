@@ -3,14 +3,18 @@ use std::path::Path;
 
 use serde::Serialize;
 
+use crate::export::onnx::{build_onnx, OnnxExportable};
+
 /// Saves a portable model to disk in the requested format.
 ///
 /// Supported `format` values (case-insensitive):
 /// - `"json"`: pretty JSON, human-readable but large
 /// - `"mpk"`: MessagePack, compact binary
+/// - `"bin"`: bincode, compact binary
+/// - `"onnx"`: ONNX graph (dense layers + activations), opset 13
 ///
 /// The matching file extension is added to `output_path` automatically.
-pub fn export_model<T: Serialize>(
+pub fn export_model<T: Serialize + OnnxExportable>(
     model: &T,
     format: &str,
     output_path: &str,
@@ -33,9 +37,7 @@ pub fn export_model<T: Serialize>(
                 .map_err(|e| format!("Failed to serialize model (bin): {e}"))?,
             "bin",
         ),
-        "onnx" => {
-            return Err("ONNX export requires a PortableModel instance. Use a specialized export function for ONNX.".to_string());
-        }
+        "onnx" => (build_onnx(model)?, "onnx"),
         other => {
             return Err(format!(
                 "Unsupported export format '{other}'. Use one of: json, mpk, bin, onnx."
@@ -44,7 +46,6 @@ pub fn export_model<T: Serialize>(
     };
 
     let target = Path::new(output_path).with_extension(ext);
-
 
     if let Some(parent) = target.parent() {
         if !parent.as_os_str().is_empty() {
