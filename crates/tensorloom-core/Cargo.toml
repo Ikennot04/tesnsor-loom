@@ -14,3 +14,4 @@ pollster = "1.0.1"
 protobuf = "=3.4.0"
 serde_json = "1.0.151"
 xgb = "3.0.6"
+prost = { version = "0.13", features = ["derive"] }

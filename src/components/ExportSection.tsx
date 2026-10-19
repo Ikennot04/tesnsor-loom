@@ -12,7 +12,7 @@ interface Props {
 const FORMATS: Record<ExportFormat, { label: string; ext: string }> = {
   json: { label: "JSON", ext: "json" },
   bin: { label: "Binary (bincode)", ext: "bin" },
-  onnx: { label: "ONNX (placeholder only)", ext: "onnx" },
+  onnx: { label: "ONNX", ext: "onnx" },
 };
 
 /** Replace (or add) the file extension, leaving the folder and base name alone. */

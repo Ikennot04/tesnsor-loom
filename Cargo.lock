@@ -8649,6 +8649,7 @@ dependencies = [
  "burn",
  "burn-wgpu",
  "pollster",
+ "prost",
  "protobuf",
  "serde",
  "serde_json",
