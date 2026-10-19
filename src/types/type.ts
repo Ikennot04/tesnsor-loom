@@ -42,6 +42,7 @@ export interface TrainConfig {
   layers: LayerConfig;
   hardware: HardwareTarget;
   task?: TaskConfig; // Rust defaults to regression (mse) when omitted
+  environment?: Record<string, unknown> | null;
 }
 
 export interface DetectedGpu {

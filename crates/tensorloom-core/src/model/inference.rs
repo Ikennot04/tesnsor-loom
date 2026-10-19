@@ -43,6 +43,12 @@ pub struct Evaluation {
     /// This is the honest number for puzzles, because given clues are trivially "correct".
     #[serde(default)]
     pub blank_accuracy: Option<f32>,
+    /// Classification only: boards solved exactly by the net-guided search (first rows only).
+    #[serde(default)]
+    pub guided_accuracy: Option<f32>,
+    /// Classification only: boards solved exactly by the pure-network greedy loop (first rows only).
+    #[serde(default)]
+    pub greedy_accuracy: Option<f32>,
 }
 
 /// Settings of a classification model, read from `PortableModel::metadata`.
@@ -272,12 +278,8 @@ impl PortableModel {
         Ok(logits.chunks(c.classes).map(softmax).collect())
     }
 
-    /// Solve a 9x9 sudoku with a classification model (9 classes, 81 cells).
-    /// `board` has 81 digits, 0 = blank. Each round the network scores every blank cell,
-    /// digits that already appear in the cell's row/column/box are ruled out, and the single
-    /// most confident (cell, digit) is filled in. Repeats until the board is full.
-    /// Returns an error if it gets stuck (a blank cell with no legal digit left).
-    pub fn solve_sudoku(&self, board: &[u8]) -> Result<Vec<u8>, String> {
+    /// Shared checks for the 9x9 sudoku solvers.
+    fn sudoku_setup(&self, board: &[u8]) -> Result<ClassInfo, String> {
         self.validate()?;
         let c = self
             .classification()
@@ -288,6 +290,89 @@ impl PortableModel {
         if board.len() != 81 || board.iter().any(|&d| d > 9) {
             return Err("board must contain 81 digits in 0..=9 (0 = blank)".to_string());
         }
+        Ok(c)
+    }
+
+    /// Solve a 9x9 sudoku with constraint propagation + backtracking, using the network
+    /// to decide which digit to try first. Returns a rule-valid board, or an error if the
+    /// board has no solution. Puzzles with a unique solution are solved essentially 100%
+    /// of the time; the network only affects speed.
+    pub fn solve_sudoku(&self, board: &[u8]) -> Result<Vec<u8>, String> {
+        let c = self.sudoku_setup(board)?;
+        let mut calls = 0usize;
+        self.guided_search(board.to_vec(), c, &mut calls, 5000)?
+            .ok_or_else(|| "no solution exists for this board".to_string())
+    }
+
+    fn guided_search(
+        &self,
+        mut b: Vec<u8>,
+        c: ClassInfo,
+        calls: &mut usize,
+        limit: usize,
+    ) -> Result<Option<Vec<u8>>, String> {
+        loop {
+            // Fill every cell that has exactly one legal digit; fail on a cell with none.
+            let mut changed = false;
+            let mut best: Option<(usize, usize)> = None; // (cell, candidate count)
+            for cell in 0..81 {
+                if b[cell] != 0 {
+                    continue;
+                }
+                let used = used_digits(&b, cell);
+                let cands: Vec<usize> = (1..=9).filter(|&d| !used[d]).collect();
+                match cands.len() {
+                    0 => return Ok(None),
+                    1 => {
+                        b[cell] = cands[0] as u8;
+                        changed = true;
+                    }
+                    n => {
+                        if best.map_or(true, |(_, bn)| n < bn) {
+                            best = Some((cell, n));
+                        }
+                    }
+                }
+            }
+            if changed {
+                continue;
+            }
+            let Some((cell, _)) = best else {
+                return Ok(Some(b)); // no blanks left
+            };
+
+            // Must guess: let the network rank the candidate digits for the tightest cell.
+            if *calls >= limit {
+                return Err("search budget exceeded".to_string());
+            }
+            *calls += 1;
+            let cells: Vec<f32> = b.iter().map(|&d| d as f32 / c.value_scale).collect();
+            let probs = self.class_probs(&cells, c)?;
+            let used = used_digits(&b, cell);
+            let mut digits: Vec<usize> = (1..=9).filter(|&d| !used[d]).collect();
+            digits.sort_by(|&x, &y| {
+                probs[cell][y - 1]
+                    .partial_cmp(&probs[cell][x - 1])
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+            for d in digits {
+                let mut nb = b.clone();
+                nb[cell] = d as u8;
+                if let Some(sol) = self.guided_search(nb, c, calls, limit)? {
+                    return Ok(Some(sol));
+                }
+            }
+            return Ok(None);
+        }
+    }
+
+    /// Pure-network solver (no search): each round the network scores every blank cell,
+    /// digits already in the cell's row/column/box are ruled out, and the single most
+    /// confident (cell, digit) is filled in. Repeats until the board is full.
+    /// This is the honest "how good is the ML itself" number.
+    /// Returns an error if it gets stuck (a blank cell with no legal digit left).
+    pub fn solve_sudoku_greedy(&self, board: &[u8]) -> Result<Vec<u8>, String> {
+        let c = self.sudoku_setup(board)?;
 
         let mut b = board.to_vec();
         while b.contains(&0) {
@@ -422,6 +507,25 @@ pub fn evaluate(model: &PortableModel, raw_csv: &str) -> Result<Evaluation, Stri
         }
     }
 
+    // Solver-level accuracy on a sample (each solve runs many forward passes).
+    const SOLVE_SAMPLE: usize = 200;
+    let (mut guided_ok, mut greedy_ok, mut tried) = (0usize, 0usize, 0usize);
+    if let Some(c) = cls {
+        if c.classes == 9 && n_in == 81 && n_out == 81 {
+            for (row, t) in rows.iter().zip(&targets).take(SOLVE_SAMPLE) {
+                let puz: Vec<u8> = row.iter().map(|v| (v * c.value_scale).round() as u8).collect();
+                let sol: Vec<u8> = t.iter().map(|v| (v * c.value_scale).round() as u8).collect();
+                tried += 1;
+                if model.solve_sudoku(&puz).map_or(false, |s| s == sol) {
+                    guided_ok += 1;
+                }
+                if model.solve_sudoku_greedy(&puz).map_or(false, |s| s == sol) {
+                    greedy_ok += 1;
+                }
+            }
+        }
+    }
+
     let per_output: Vec<OutputEvaluation> = (0..n_out)
         .map(|j| {
             let mse = sq_err[j] / n;
@@ -445,5 +549,7 @@ pub fn evaluate(model: &PortableModel, raw_csv: &str) -> Result<Evaluation, Stri
         } else {
             None
         },
+        guided_accuracy: if tried > 0 { Some(guided_ok as f32 / tried as f32) } else { None },
+        greedy_accuracy: if tried > 0 { Some(greedy_ok as f32 / tried as f32) } else { None },
     })
 }

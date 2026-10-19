@@ -1,7 +1,10 @@
 use crate::config::TrainConfig;
+use crate::data::Environment;
 use crate::events::{EdgeBlock, NetworkSnapshot, TrainEvent};
 use crate::model::{PortableModel, PrimitiveLayer};
 use std::sync::mpsc::Sender;
+
+use super::boost;
 
 // Burn ML core imports
 use burn::backend::ndarray::{NdArray, NdArrayDevice};
@@ -26,6 +29,7 @@ const MIN_ROWS_FOR_SPLIT: usize = 20; // below this, validate on the training da
 const WARMUP_FRACTION: f64 = 0.03; // LR warm-up, as a share of all steps
 const MIN_LR_FRACTION: f64 = 0.01; // cosine decay floor, as a share of base LR
 const GRAD_CLIP_NORM: f32 = 1.0;
+const AUGMENT: bool = true; // random Sudoku symmetries, regenerated every batch
 
 /// Activation applied after a layer. Kept outside the Burn module so any
 /// number of layers can each pick their own.
@@ -243,6 +247,69 @@ impl Rng {
 }
 
 // ---------------------------------------------------------------------------
+// Sudoku symmetry augmentation
+// ---------------------------------------------------------------------------
+
+/// Random validity-preserving transform of a 9x9 board.
+/// Returns (cell_map, digit_map): new cell i takes the value of old cell cell_map[i],
+/// and digits are relabelled through digit_map (0 stays 0).
+fn random_symmetry(rng: &mut Rng) -> ([usize; 81], [u8; 10]) {
+    fn perm3(rng: &mut Rng) -> [usize; 3] {
+        let mut v = [0usize, 1, 2];
+        rng.shuffle(&mut v[..]);
+        v
+    }
+    let (mut row_map, mut col_map) = ([0usize; 9], [0usize; 9]);
+    let (band_r, band_c) = (perm3(rng), perm3(rng));
+    for b in 0..3 {
+        let (wr, wc) = (perm3(rng), perm3(rng));
+        for i in 0..3 {
+            row_map[b * 3 + i] = band_r[b] * 3 + wr[i];
+            col_map[b * 3 + i] = band_c[b] * 3 + wc[i];
+        }
+    }
+    let transpose = rng.next() & 1 == 1;
+    let mut cell_map = [0usize; 81];
+    for r in 0..9 {
+        for c in 0..9 {
+            let (rr, cc) = (row_map[r], col_map[c]);
+            cell_map[r * 9 + c] = if transpose { cc * 9 + rr } else { rr * 9 + cc };
+        }
+    }
+    let mut digits = [1u8, 2, 3, 4, 5, 6, 7, 8, 9];
+    rng.shuffle(&mut digits[..]);
+    let mut digit_map = [0u8; 10];
+    for k in 1..=9 {
+        digit_map[k] = digits[k - 1];
+    }
+    (cell_map, digit_map)
+}
+
+/// Build one augmented batch: one-hot inputs [bs, 81*(classes+1)] and class-id labels [bs, 81].
+fn make_batch(
+    raw_x: &[u8], // digits 0..=9, 81 per row
+    raw_y: &[u8], // class ids 0..=8, 81 per row
+    chunk: &[i32],
+    rng: &mut Rng,
+    classes: usize,
+) -> (Vec<f32>, Vec<f32>) {
+    let w = classes + 1;
+    let mut x = vec![0f32; chunk.len() * 81 * w];
+    let mut y = Vec::with_capacity(chunk.len() * 81);
+    for (b, &ri) in chunk.iter().enumerate() {
+        let r = ri as usize;
+        let (cell_map, dm) = random_symmetry(rng);
+        for new in 0..81 {
+            let old = cell_map[new];
+            let d = dm[raw_x[r * 81 + old] as usize] as usize;
+            x[(b * 81 + new) * w + d] = 1.0;
+            y.push((dm[raw_y[r * 81 + old] as usize + 1] - 1) as f32);
+        }
+    }
+    (x, y)
+}
+
+// ---------------------------------------------------------------------------
 // Classification support (softmax + cross-entropy over groups of outputs)
 // ---------------------------------------------------------------------------
 
@@ -297,14 +364,22 @@ fn batch_loss<B: Backend>(
     )
 }
 
-/// Returns (loss, per-cell accuracy, whole-board accuracy).
+/// Returns (loss, cell acc, board acc, rule-valid rate, blank-cell acc).
+///
+/// `blank` has n*groups flags: true = the cell was blank in the puzzle. Blank-cell accuracy
+/// is the honest number, because given clues are trivially "correct".
+/// The rule-valid rate is the share of predicted boards that satisfy every rule in the
+/// environment (a board can be valid without matching the target solution). It is
+/// 0.0 when no environment is attached; callers should only show it when one is.
 fn evaluate_ce<B: Backend>(
     model: &TensorLoomNetwork<B>,
     acts: &[Act],
     x: Tensor<B, 2>,
     labels: Tensor<B, 2, Int>,
     classes: usize,
-) -> Result<(f32, f32, f32), String> {
+    env: Option<&Environment>,
+    blank: &[bool],
+) -> Result<(f32, f32, f32, f32, f32), String> {
     let logits = model.forward(x, acts);
     let [n, total] = logits.dims();
     let groups = total / classes;
@@ -319,24 +394,47 @@ fn evaluate_ce<B: Backend>(
     let p = tensor_to_vec(pred)?;
     let t = tensor_to_vec(labels.float())?;
 
-    let (mut cells_ok, mut boards_ok) = (0usize, 0usize);
+    // Only check rules when the board size the environment expects matches the output.
+    let rule_env = env.filter(|e| e.io_shape().1 == groups);
+
+    let (mut cells_ok, mut boards_ok, mut valid_ok) = (0usize, 0usize, 0usize);
+    let (mut blank_ok, mut blank_total) = (0usize, 0usize);
     for r in 0..n {
         let mut all = true;
         for g in 0..groups {
-            if p[r * groups + g] == t[r * groups + g] {
+            let hit = p[r * groups + g] == t[r * groups + g];
+            if hit {
                 cells_ok += 1;
             } else {
                 all = false;
             }
+            if blank.get(r * groups + g).copied().unwrap_or(true) {
+                blank_total += 1;
+                if hit {
+                    blank_ok += 1;
+                }
+            }
         }
         if all {
             boards_ok += 1;
+        }
+        if let Some(e) = rule_env {
+            // class id 0..classes-1 -> digit 1..=classes
+            let board: Vec<u8> = p[r * groups..(r + 1) * groups]
+                .iter()
+                .map(|&c| c as u8 + 1)
+                .collect();
+            if e.violations(&board).is_empty() {
+                valid_ok += 1;
+            }
         }
     }
     Ok((
         loss,
         cells_ok as f32 / (n * groups) as f32,
         boards_ok as f32 / n as f32,
+        valid_ok as f32 / n as f32,
+        blank_ok as f32 / blank_total.max(1) as f32,
     ))
 }
 
@@ -344,10 +442,21 @@ fn evaluate_ce<B: Backend>(
 // Dynamic pipeline routing gateway
 // ---------------------------------------------------------------------------
 pub fn execute_training(
-    config: TrainConfig,
+    mut config: TrainConfig,
     raw_csv_data: String,
     tx: Sender<TrainEvent>,
 ) -> Result<PortableModel, String> {
+    // The rules file (if any) is the source of truth for the task and the layer sizes.
+    if let Some(env) = &config.environment {
+        env.validate()?;
+        env.check_layers(config.layers.in_features, config.layers.out_features)?;
+        config.task = env.task.clone();
+        let _ = tx.send(TrainEvent::Log {
+            level: "info".into(),
+            message: format!("Environment '{}' loaded: {} rules.", env.name, env.rules.len()),
+        });
+    }
+
     match config.hardware.target_mode.as_str() {
         "GPU_DISCRETE" => {
             let device = WgpuDevice::DiscreteGpu(config.hardware.device_index);
@@ -530,6 +639,9 @@ where
         return Err("task.value_scale must be > 0".to_string());
     }
 
+    // Rules used for the validity metric (classification only).
+    let env: Option<Environment> = if ce { config.environment.clone() } else { None };
+
     // The network sees one-hot inputs and emits logits for every (cell, class) pair.
     let net_in = if ce { input_dim * (classes + 1) } else { input_dim };
     let net_out = if ce { output_dim * classes } else { output_dim };
@@ -554,6 +666,25 @@ where
     // ---- Data: parse, (encode), shuffle, split ----
     let data = parse_csv(&raw_data, input_dim, output_dim)?;
     let n = data.rows;
+
+    // Raw digits kept for augmentation, the blank-cell mask and the XGBoost stage
+    // (classification only). Taken before the encode step below, which may move `data.features`.
+    let raw_x: Vec<u8> = if ce {
+        data.features
+            .iter()
+            .map(|v| (v * value_scale).round() as u8)
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let raw_y: Vec<u8> = if ce {
+        data.targets
+            .iter()
+            .map(|v| ((v * value_scale).round() as u8).saturating_sub(1))
+            .collect()
+    } else {
+        Vec::new()
+    };
 
     // Classification: features -> one-hot, targets -> class ids (as f32).
     let (features, targets) = if ce {
@@ -586,6 +717,27 @@ where
     let mut x_val_v = gather(&features, &val_idx, net_in);
     let mut y_val_v = gather(&targets, &val_idx, output_dim);
 
+    // ---- Sudoku augmentation + blank-cell mask ----
+    let augment =
+        AUGMENT && ce && classes == 9 && input_dim == 81 && output_dim == 81 && env.is_some();
+    let raw_x_train = if augment { gather(&raw_x, &train_idx, input_dim) } else { Vec::new() };
+    let raw_y_train = if augment { gather(&raw_y, &train_idx, output_dim) } else { Vec::new() };
+    // Input cell j and output cell j are the same cell, so blank input = cell to predict.
+    let val_blank: Vec<bool> = if ce && input_dim == output_dim {
+        gather(&raw_x, &val_idx, input_dim)
+            .iter()
+            .map(|&d| d == 0)
+            .collect()
+    } else {
+        Vec::new()
+    };
+    if augment {
+        let _ = tx.send(TrainEvent::Log {
+            level: "info".into(),
+            message: "Sudoku symmetry augmentation enabled (fresh transform every batch).".into(),
+        });
+    }
+
     // ---- Standardize (statistics from the training rows only: no leakage) ----
     // Regression: inputs are always standardized; targets only when the output
     // activation is linear. Classification: one-hot inputs and class ids are left alone.
@@ -616,7 +768,11 @@ where
     };
 
     // ---- Batching ----
-    let batch_size = (nt / 10).clamp(16, 256).min(nt);
+    let batch_size = if config.batch_size > 0 {
+        config.batch_size.clamp(16, 1024).min(nt)
+    } else {
+        (nt / 10).clamp(16, 256).min(nt)
+    };
     let steps_per_epoch = nt.div_ceil(batch_size);
     let total_steps = steps_per_epoch * config.epochs;
 
@@ -680,8 +836,9 @@ where
     let mut best_model: Option<TensorLoomNetwork<B::InnerBackend>> = None;
     let mut best_val = f32::INFINITY;
     let mut best_epoch = 0usize;
-    // Regression: per-output R^2. Classification: [cell accuracy, board accuracy].
-    let mut best_r2: Vec<f32> = vec![0.0; if ce { 2 } else { output_dim }];
+    // Regression: per-output R^2.
+    // Classification: [cell accuracy, board accuracy, rule-valid board rate, blank-cell accuracy].
+    let mut best_r2: Vec<f32> = vec![0.0; if ce { 4 } else { output_dim }];
     let mut stale = 0usize;
     let mut last_epoch = 0usize;
 
@@ -694,12 +851,22 @@ where
         let mut loss_sum = Tensor::<B, 1>::zeros([1], &device); // stays on-device until epoch end
 
         for chunk in shuffled.chunks(batch_size) {
-            let idx = Tensor::<B, 1, Int>::from_data(
-                TensorData::new(chunk.to_vec(), [chunk.len()]),
-                &device,
-            );
-            let xb = x_train.clone().select(0, idx.clone());
-            let yb = y_train.clone().select(0, idx);
+            let (xb, yb) = if augment {
+                let (xv, yv) = make_batch(&raw_x_train, &raw_y_train, chunk, &mut rng, classes);
+                (
+                    Tensor::<B, 2>::from_data(TensorData::new(xv, [chunk.len(), net_in]), &device),
+                    Tensor::<B, 2>::from_data(
+                        TensorData::new(yv, [chunk.len(), output_dim]),
+                        &device,
+                    ),
+                )
+            } else {
+                let idx = Tensor::<B, 1, Int>::from_data(
+                    TensorData::new(chunk.to_vec(), [chunk.len()]),
+                    &device,
+                );
+                (x_train.clone().select(0, idx.clone()), y_train.clone().select(0, idx))
+            };
 
             let pred = model.forward(xb, &acts);
             let loss = if ce {
@@ -719,14 +886,17 @@ where
         // ---- Validation on the detached model ----
         let inner = model.valid();
         let (val_loss, metrics, val_score) = if ce {
-            let (l, cell_acc, board_acc) = evaluate_ce(
+            let (l, cell_acc, board_acc, valid_rate, blank_acc) = evaluate_ce(
                 &inner,
                 &acts,
                 x_val_inner.clone(),
                 y_val_inner.clone().int(),
                 classes,
+                env.as_ref(),
+                &val_blank,
             )?;
-            (l, vec![cell_acc, board_acc], cell_acc) // UI score = per-cell accuracy
+            // UI score = blank-cell accuracy (the honest number)
+            (l, vec![cell_acc, board_acc, valid_rate, blank_acc], blank_acc)
         } else {
             let (l, r2) = evaluate(
                 &inner,
@@ -768,7 +938,7 @@ where
         let _ = tx.send(TrainEvent::EpochCompleted {
             epoch,
             avg_loss: train_loss,
-            val_accuracy: val_score, // held-out score (macro R^2, or per-cell accuracy)
+            val_accuracy: val_score, // held-out score (macro R^2, or blank-cell accuracy)
         });
 
         if stale >= patience {
@@ -785,11 +955,58 @@ where
     // ---- Export the BEST checkpoint, not whatever the last epoch happened to be ----
     let final_model = best_model.ok_or_else(|| "Training produced no model".to_string())?;
 
+    // ---- Stage 2: XGBoost on top of the best Burn checkpoint ----
+    // Fitted on held-out puzzles only, so it sees Burn's honest (not over-confident) predictions.
+    let mut xgb_meta = String::new();
+    if config.xgb.enable {
+        if !(ce && classes == 9 && input_dim == 81 && output_dim == 81) {
+            let _ = tx.send(TrainEvent::Log {
+                level: "warn".into(),
+                message: "XGBoost stage skipped: only 9x9 sudoku classification is supported."
+                    .into(),
+            });
+        } else {
+            let m = nv.min(config.xgb.max_puzzle.max(10));
+            let logits =
+                final_model.forward(x_val_inner.clone().slice([0..m, 0..net_in]), &acts);
+            let probs = tensor_to_vec(activation::softmax(logits.reshape([m * 81, 9]), 1))?;
+            let rx = gather(&raw_x, &val_idx[..m], input_dim);
+            let ry = gather(&raw_y, &val_idx[..m], output_dim);
+
+            match boost::train_stage_two(&probs, &rx, &ry, m, &config.xgb, env.as_ref(), &tx) {
+                Ok(rep) => {
+                    let _ = tx.send(TrainEvent::Log {
+                        level: "info".into(),
+                        message: format!(
+                            "Blank-cell accuracy: Burn alone {:.3} -> Burn+XGBoost {:.3}. Full boards {:.3}, rule-valid {:.3}. Saved {}.",
+                            rep.burn_blank_acc,
+                            rep.xgb_blank_acc,
+                            rep.xgb_board_acc,
+                            rep.xgb_valid_rate,
+                            rep.model_path
+                        ),
+                    });
+                    xgb_meta = format!(" | xgb={}", rep.model_path);
+                }
+                Err(e) => {
+                    let _ = tx.send(TrainEvent::Log {
+                        level: "warn".into(),
+                        message: format!("XGBoost stage failed (Burn model still exported): {e}"),
+                    });
+                }
+            }
+        }
+    }
+
     let summary = if ce {
-        format!(
-            "cell accuracy={:.3}, full-board accuracy={:.3}",
-            best_r2[0], best_r2[1]
-        )
+        let mut s = format!(
+            "blank-cell accuracy={:.3}, cell accuracy={:.3}, full-board accuracy={:.3}",
+            best_r2[3], best_r2[0], best_r2[1]
+        );
+        if env.is_some() {
+            s.push_str(&format!(", rule-valid boards={:.3}", best_r2[2]));
+        }
+        s
     } else {
         format!(
             "Per-output R^2: {}",
@@ -817,9 +1034,10 @@ where
 
     let metadata = if ce {
         // Parsed by PortableModel::classification() in model/inference.rs - keep the format.
+        // `xgb_meta` is empty unless the XGBoost stage ran; check the parser tolerates the extra segment.
         format!(
-            "TensorLoom Engine v1.1 | task=classification | classes={} | value_scale={}",
-            classes, value_scale
+            "TensorLoom Engine v1.1 | task=classification | classes={} | value_scale={}{}",
+            classes, value_scale, xgb_meta
         )
     } else {
         "TensorLoom Engine v1.1 Cross-Platform".to_string()
