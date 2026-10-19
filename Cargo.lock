@@ -8651,9 +8651,11 @@ dependencies = [
  "pollster",
  "protobuf",
  "serde",
+ "serde_json",
  "sysinfo 0.39.6",
  "thiserror 2.0.21",
  "wgpu 30.0.1",
+ "xgb",
 ]
 
 [[package]]
@@ -9092,7 +9094,7 @@ dependencies = [
  "libc",
  "serde",
  "serde_json",
- "ureq",
+ "ureq 2.12.1",
  "zip 0.6.6",
 ]
 
@@ -9510,6 +9512,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "ureq"
+version = "3.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a7ac20be9b7726e0bbdbf974c059676d9acb1cd414961f570a4e8231cacd7fc"
+dependencies = [
+ "base64 0.23.1",
+ "flate2",
+ "log",
+ "percent-encoding",
+ "rustls",
+ "rustls-pki-types",
+ "ureq-proto",
+ "utf8-zero",
+ "webpki-roots 1.0.9",
+]
+
+[[package]]
+name = "ureq-proto"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f86fd172ccca569e458f61b6bdd6220965a9ef36e672a6852953b51a0e1583be"
+dependencies = [
+ "base64 0.23.1",
+ "http",
+ "httparse",
+ "log",
+]
+
+[[package]]
 name = "url"
 version = "2.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9533,6 +9564,12 @@ dependencies = [
  "serde",
  "url",
 ]
+
+[[package]]
+name = "utf8-zero"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b8c0a043c9540bae7c578c88f91dda8bd82e59ae27c21baca69c8b191aaf5a6e"
 
 [[package]]
 name = "utf8_iter"
@@ -10825,6 +10862,33 @@ checksum = "32e45ad4206f6d2479085147f02bc2ef834ac85886624a23575ae137c8aa8156"
 dependencies = [
  "libc",
  "rustix",
+]
+
+[[package]]
+name = "xgb"
+version = "3.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3b35cd0e424fa6f2a9cef5665347789307531634a6a5c02aeacab486e2c8e379"
+dependencies = [
+ "derive_builder",
+ "indexmap 2.14.2",
+ "libc",
+ "log",
+ "tempfile",
+ "xgboost_lib-sys",
+]
+
+[[package]]
+name = "xgboost_lib-sys"
+version = "3.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e887e079ddebb2cf20210579bff2506c1b781fff58d2e1458ae0180056b2b9ba"
+dependencies = [
+ "bindgen",
+ "dunce",
+ "libc",
+ "sha2",
+ "ureq 3.4.2",
 ]
 
 [[package]]

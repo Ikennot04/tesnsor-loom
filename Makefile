@@ -6,7 +6,7 @@
 #
 # run: build
 # 	./target/release/server --open
-
+:Q:
 # run:
 # 	npm run build
 # 	cargo run --release --manifest-path src-tauri/Cargo.toml
@@ -16,7 +16,7 @@
 
 build:
 	npm ci
-	npm run build
+	npm run tauri build
 	cargo build --release -p server
 
 run: build
@@ -27,6 +27,7 @@ dev:
 	npm run tauri dev
 
 clean:
+	cargo clean
 	rm -rf node_modules
 	rm -rf ui/node_modules
 	rm -rf ui/dist
