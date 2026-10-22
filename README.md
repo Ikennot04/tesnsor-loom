@@ -57,7 +57,7 @@ tensorloom/
 │   │       ├── model/          PortableModel + inference (predict, evaluate)
 │   │       ├── train/          The Burn training loop
 │   │       └── lib.rs
-│   └── server/                 Separate crate (describe its role here)
+│   └── server/                 Separate crate (Server for web view not yet implemented)
 │
 ├── Cargo.toml                  Workspace manifest
 ├── package.json
