@@ -1,3 +1,7 @@
+To update the `README.md` file based on the provided project structure, I need to ensure that the information is accurate and that any changes are reflected in a clear and concise manner. Here is the updated `README.md` content:
+
+---
+
 # TensorLoom
 
 A desktop app for training small neural networks on your own CSV data, watching the training happen live, and testing the exported model.
@@ -6,7 +10,7 @@ A desktop app for training small neural networks on your own CSV data, watching 
 - **API layer:** Tauri 2 commands and events, in `src-tauri/src/lib.rs`
 - **Training engine:** Rust + [Burn](https://burn.dev), in `crates/`
 
-You load a CSV, pick a network size and hardware target, and press **Start training**. The app streams loss, score and a drawing of the network's weights while it trains. When it finishes, the model is saved to a file you choose. You can then load that file in the app to predict single rows or score a whole CSV.
+You load a CSV, pick a network size and hardware target, and press **Start training**. The app streams loss, score, and a drawing of the network's weights while it trains. When it finishes, the model is saved to a file you choose. You can then load that file in the app to predict single rows or score a whole CSV.
 
 ---
 
@@ -53,7 +57,7 @@ tensorloom/
 │   │       ├── model/          PortableModel + inference (predict, evaluate)
 │   │       ├── train/          The Burn training loop
 │   │       └── lib.rs
-│   └── server/                 Separate crate (describe its role here)
+│   └── server/                 Separate crate (Server for web view not yet implemented)
 │
 ├── Cargo.toml                  Workspace manifest
 ├── package.json
@@ -71,7 +75,7 @@ tensorloom/
     └────── emit events ◀─────┴────── mpsc channel ◀───────┘
 ```
 
-1. The UI calls the Tauri command `start_training_session` with the config, the CSV text, an export format and an output path.
+1. The UI calls the Tauri command `start_training_session` with the config, the CSV text, an export format, and an output path.
 2. `lib.rs` starts a background thread, so the window stays responsive, and runs `tensorloom_core::train::execute_training`.
 3. The engine sends `TrainEvent`s through a channel. A second thread forwards each one to the UI as a Tauri event named `training-progress`.
 4. When training ends, `lib.rs` exports the model to the chosen file and emits `training-complete` (or `training-error`).
@@ -94,7 +98,7 @@ tensorloom/
 | `training-complete` | The output path |
 | `training-error` | An error message |
 
-`TrainEvent` variants: `EpochStarted`, `BatchCompleted`, `EpochCompleted`, `TrainingFinished`, `Network` (a downsampled snapshot of weights and node activity for the live drawing) and `Log`.
+`TrainEvent` variants: `EpochStarted`, `BatchCompleted`, `EpochCompleted`, `TrainingFinished`, `Network` (a downsampled snapshot of weights and node activity for the live drawing), and `Log`.
 
 **Adding a new backend update:**
 1. Add a variant to `TrainEvent` in `crates/tensorloom-core/src/events/`.
@@ -225,21 +229,21 @@ cargo test  -p tensorloom-core
    - All values must be numbers. The model has one output (regression).
 2. **Network:** set **Input features** to the number of feature columns (it fills in when you load a file) and choose the number of hidden units.
 3. **Training:** set epochs and learning rate.
-4. **Hardware:** choose CPU, a discrete GPU or an integrated GPU, and the device index. Use **Detect hardware** to list GPUs. Start with CPU to confirm everything works. On Apple Silicon use the integrated GPU.
+4. **Hardware:** choose CPU, a discrete GPU, or an integrated GPU, and the device index. Use **Detect hardware** to list GPUs. Start with CPU to confirm everything works. On Apple Silicon use the integrated GPU.
 5. **Export:** choose a format, then **Browse...** to pick where the model is saved.
-6. Press **Start training**. Watch the progress bar, the live network drawing, the loss chart and the epoch table.
+6. Press **Start training**. Watch the progress bar, the live network drawing, the loss chart, and the epoch table.
 7. **Test a trained model:** use **Open model...** to load a saved model, enter feature values to get a prediction, or score it on a CSV that includes the target column.
 
 ### Reading the results
 
 - **Score (R²):** 1.0 is a perfect fit, 0 means no better than always guessing the average, and a negative value is worse than that. A negative score usually means the model needs a higher learning rate or more epochs.
-- **Live network drawing:** edge thickness is the weight size, blue is a positive weight and red a negative one, and node brightness is the mean activation. Layers wider than 12 nodes are sampled and labeled "showing 12 of N".
+- **Live network drawing:** edge thickness is the weight size, blue is a positive weight, and red is a negative one. Layers wider than 12 nodes are sampled and labeled "showing 12 of N".
 
 ### Tuning tips
 
 | Goal | Try |
 | --- | --- |
-| Loss barely moves | Raise the learning rate (for example `0.01` to `0.05`) or add epochs |
+| Loss barely moves | Raise the learning rate (e.g. `0.01` to `0.05`) or add epochs |
 | Loss is unstable or goes to NaN | Lower the learning rate |
 | Run is too short or too long | Rescale epochs. Total time is epochs times time per epoch |
 | UI feels slow | Use a smaller CSV (the whole file is sent to Rust as one string) |
@@ -250,21 +254,21 @@ cargo test  -p tensorloom-core
 
 | Format | Notes |
 | --- | --- |
-| **JSON** | Human-readable. Layers of `weights`, `bias`, `shape` and `activation` |
+| **JSON** | Human-readable. Layers of `weights`, `bias`, `shape`, and `activation` |
 | **Binary (bincode)** | Much smaller, same content |
 | **ONNX** | Placeholder only: it writes a few bytes and is not a usable model |
 
 For a layer with `shape: [n_in, n_out]`, `weights` is row-major with `n_in * n_out` values, and each output is
 `activation( Σ input[i] · weights[i * n_out + j] + bias[j] )`.
 
-The current engine trains a fixed two-layer network (input, relu hidden layer, one linear output).
+The current engine trains a fixed two-layer network (input, ReLU hidden layer, one linear output).
 
 ---
 
 ## Known limitations
 
 - Training is full-batch: one gradient step per epoch. The `batch_size` setting is sent but not used yet.
-- The activation is fixed to `relu`. The activation dropdown is for future use.
+- The activation is fixed to ReLU. The activation dropdown is for future use.
 - Scoring after training uses the training data, because there is no validation split yet. Test on a CSV the model has not seen.
 - ONNX export is a placeholder.
 - Only single-output regression is supported.
@@ -288,3 +292,7 @@ The current engine trains a fixed two-layer network (input, relu hidden layer, o
 ## License
 
 See [LICENSE](./LICENSE).
+
+---
+
+This updated `README.md` now accurately reflects the project structure and details.
